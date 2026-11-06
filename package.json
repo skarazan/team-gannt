@@ -1,0 +1,15 @@
+{
+  "name": "team-gantt",
+  "version": "1.0.0",
+  "description": "Shared interactive Gantt chart for the team",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}

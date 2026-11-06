@@ -1,0 +1,15 @@
+{
+  "groups": [
+    {
+      "name": "Art Database",
+      "tasks": [
+        { "title": "Define tile categories and naming", "assignee": "Member 2", "start": "2026-11-09", "end": "2026-11-11", "status": "todo", "progress": 0, "notes": "roads, buildings, forests, water" },
+        { "title": "Generate road tiles", "start": "2026-11-12", "end": "2026-11-20" }
+      ]
+    },
+    {
+      "name": "A brand new workflow (created automatically if it does not exist)",
+      "tasks": [ { "title": "Single-day task", "start": "2026-11-09" } ]
+    }
+  ]
+}

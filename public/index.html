@@ -1,0 +1,562 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Team Gantt</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%235271FF'/%3E%3Crect x='5' y='8' width='14' height='5' rx='2' fill='%23fff'/%3E%3Crect x='11' y='17' width='16' height='5' rx='2' fill='%23FF7A1F'/%3E%3C/svg%3E">
+<style>
+  :root { --ink:#0a0a1f; --line:#dcdfeb; --left:430px; --muted:#6b7090; }
+  * { box-sizing: border-box; }
+  html, body { height:100%; margin:0; }
+  body { font:14px/1.3 "Noto Sans", system-ui, -apple-system, "Segoe UI", sans-serif; color:var(--ink); background:#fff; display:flex; flex-direction:column; }
+  header { display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px; padding:10px 14px; border-bottom:2px solid #111; }
+  h1 { font-size:18px; margin:0 8px 0 0; }
+  .spacer { flex:1; }
+  button, select, input, textarea { font:inherit; color:inherit; }
+  .btn { border:2px solid #111; background:#fff; border-radius:8px; padding:5px 11px; cursor:pointer; font-weight:600; }
+  .btn:hover { background:#f1f2fa; }
+  .btn.primary { background:#5271FF; color:#fff; }
+  .btn.primary:hover { background:#3f5ee8; }
+  .btn.danger { background:#FF5757; color:#fff; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; }
+  .chip { display:inline-flex; align-items:center; gap:6px; border:2px solid #111; border-radius:999px; padding:2px 10px 2px 6px; background:#fff; cursor:pointer; font-size:13px; font-weight:600; }
+  .chip i { width:12px; height:12px; border-radius:50%; border:2px solid #111; display:inline-block; }
+  .chip small { color:var(--muted); font-weight:500; }
+  .chip.on { background:#111; color:#fff; } .chip.on small { color:#ccd; }
+  #sync { font-size:11px; font-weight:500; color:var(--muted); margin-left:6px; }
+  #scroller { flex:1; overflow:auto; position:relative; }
+  #chart { position:relative; min-width:max-content; }
+  .hdrwrap { position:sticky; top:0; z-index:8; background:#fff; border-bottom:2px solid #111; }
+  .row { display:flex; height:38px; border-bottom:1px solid var(--line); }
+  .row.h { height:26px; border-bottom:1px solid var(--line); }
+  .row.group { background:#f3f4fb; font-weight:700; }
+  .lcell { position:sticky; left:0; z-index:6; width:var(--left); flex:none; display:flex; align-items:center; gap:6px; padding:0 8px; border-right:2px solid #111; background:#fff; overflow:hidden; }
+  .row.group .lcell { background:#f3f4fb; }
+  .tcell { position:relative; flex:none; }
+  .hdrwrap .lcell { color:var(--muted); font-weight:600; font-size:12px; }
+  .hdr span { position:absolute; top:0; bottom:0; display:flex; align-items:center; justify-content:center; font-size:11px; color:var(--muted); border-left:1px solid var(--line); overflow:hidden; white-space:nowrap; }
+  .hdr.m span { justify-content:flex-start; padding-left:6px; font-weight:700; color:var(--ink); font-size:12px; }
+  .hdr span.we { background:rgba(20,30,80,.05); }
+  .hdr span.td { background:#111; color:#fff; font-weight:700; }
+  .caret { width:22px; height:22px; border:0; background:none; cursor:pointer; font-size:12px; padding:0; }
+  .dot { width:14px; height:14px; border-radius:4px; border:2px solid #111; flex:none; }
+  .gname { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer; }
+  .meta { color:var(--muted); font-weight:500; font-size:12px; white-space:nowrap; }
+  .mini { border:2px solid #111; background:#fff; border-radius:6px; font-size:12px; font-weight:700; padding:0 7px; height:22px; cursor:pointer; flex:none; }
+  .mini:hover { background:#e9ebfb; }
+  .tname { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer; padding-left:20px; }
+  .tname:hover { text-decoration:underline; }
+  .tname.done { color:var(--muted); text-decoration:line-through; }
+  .asg { width:112px; flex:none; border:2px solid #111; border-radius:6px; background:#fff; height:26px; font-size:12px; padding:0 2px; }
+  .bar { position:absolute; top:8px; height:22px; border:2px solid #111; border-radius:6px; cursor:grab; overflow:hidden; z-index:3; touch-action:none; user-select:none; }
+  .bar:active { cursor:grabbing; }
+  .bar .fill { position:absolute; inset:0 auto 0 0; background:rgba(0,0,0,.32); pointer-events:none; }
+  .bar .lbl { position:absolute; inset:0; padding:0 9px; display:flex; align-items:center; color:#fff; font-size:12px; font-weight:700; white-space:nowrap; overflow:hidden; text-shadow:0 0 3px rgba(0,0,0,.75); pointer-events:none; }
+  .bar .hl, .bar .hr { position:absolute; top:0; bottom:0; width:8px; cursor:ew-resize; z-index:2; }
+  .bar .hl { left:0; } .bar .hr { right:0; }
+  .bar.blocked { border-color:#d11; border-style:dashed; }
+  .bar.done { opacity:.7; }
+  .sum { position:absolute; top:13px; height:12px; border:2px solid #111; border-radius:3px; z-index:2; pointer-events:none; }
+  #today { position:absolute; top:0; bottom:0; width:2px; background:#FF5757; z-index:4; pointer-events:none; }
+  .empty { padding:40px; color:var(--muted); }
+  /* dialogs */
+  dialog { border:2px solid #111; border-radius:12px; padding:0; width:min(480px, 94vw); box-shadow:0 12px 40px rgba(0,0,0,.25); }
+  dialog::backdrop { background:rgba(10,10,31,.4); }
+  dialog form { padding:16px 18px; display:grid; gap:10px; }
+  dialog h2 { margin:0 0 2px; font-size:17px; }
+  label.f { display:grid; gap:3px; font-size:12px; font-weight:700; color:var(--muted); }
+  label.f input, label.f select, label.f textarea { border:2px solid #111; border-radius:8px; padding:6px 8px; font-size:14px; font-weight:400; color:var(--ink); background:#fff; width:100%; }
+  label.f input[type=color] { padding:2px; height:36px; }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .prog { display:grid; grid-template-columns:1fr 70px; gap:8px; align-items:center; }
+  .prog input[type=range] { border:0; padding:0; }
+  .actions { display:flex; gap:8px; justify-content:flex-end; margin-top:4px; }
+  .actions .left { margin-right:auto; }
+  .team-row { display:grid; grid-template-columns:1fr 54px; gap:8px; }
+  .team-row input { border:2px solid #111; border-radius:8px; padding:6px 8px; font-size:14px; }
+  .team-row input[type=color] { padding:2px; height:36px; }
+  #main { flex:1; display:flex; min-height:0; }
+  #main #scroller { min-width:0; }
+  #mine { width:350px; flex:none; border-left:2px solid #111; overflow:auto; background:#fff; padding:14px; }
+  #mine[hidden] { display:none; }
+  #mine h3 { margin:0 0 2px; font-size:16px; display:flex; align-items:center; gap:8px; }
+  #mine .sub { color:var(--muted); font-size:12px; margin-bottom:10px; }
+  #mine h4 { margin:14px 0 6px; font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
+  #mine h4.od { color:#d11; }
+  .mt { border:2px solid #111; border-radius:10px; padding:8px 10px; margin-bottom:8px; display:grid; grid-template-columns:22px 1fr; gap:2px 8px; background:#fff; }
+  .mt.od { border-color:#d11; background:#fff5f5; }
+  .mt input[type=checkbox] { width:18px; height:18px; margin:2px 0 0; cursor:pointer; accent-color:#5271FF; }
+  .mt .tt { font-weight:700; cursor:pointer; overflow-wrap:anywhere; }
+  .mt .tt:hover { text-decoration:underline; }
+  .mt .ln { grid-column:2; font-size:12px; color:var(--muted); display:flex; flex-wrap:wrap; gap:4px 10px; align-items:center; }
+  .mt .ln b { color:var(--ink); }
+  .mt select { border:2px solid #111; border-radius:6px; font-size:12px; height:24px; background:#fff; }
+  .mt .gd { display:inline-block; width:10px; height:10px; border-radius:3px; border:2px solid #111; vertical-align:-1px; margin-right:3px; }
+  .mt.free { border-style:dashed; }
+  .badge { background:#FF5757; color:#fff; border-radius:999px; font-size:11px; padding:0 6px; margin-left:4px; }
+  .badge:empty { display:none; }
+  .who { display:flex; align-items:center; gap:10px; width:100%; border:2px solid #111; border-radius:10px; background:#fff; padding:10px 12px; font-size:15px; font-weight:700; cursor:pointer; text-align:left; }
+  .who:hover { background:#eef0ff; }
+  .who i { width:16px; height:16px; border-radius:50%; border:2px solid #111; flex:none; }
+  .who small { margin-left:auto; color:var(--muted); font-weight:500; font-size:12px; }
+  .bar.mine { box-shadow:0 0 0 3px #FFD43B, 0 0 0 5px #111; z-index:4; }
+  .tname .star { color:#e0a800; margin-right:3px; }
+  #toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:#111; color:#fff; padding:9px 16px; border-radius:8px; font-weight:600; display:none; z-index:50; max-width:90vw; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Team Gantt <span id="sync">connecting...</span></h1>
+  <div class="chips" id="chips"></div>
+  <div class="spacer"></div>
+  <button class="btn" id="meBtn" title="Switch user"></button>
+  <button class="btn" id="mineBtn">My tasks<span class="badge" id="mineCount"></span></button>
+  <select id="zoom" class="btn" title="Zoom">
+    <option value="26">Days</option>
+    <option value="12">Weeks</option>
+    <option value="5">Months</option>
+  </select>
+  <button class="btn" id="todayBtn">Today</button>
+  <button class="btn" id="teamBtn">Team</button>
+  <button class="btn" id="exportBtn">Export</button>
+  <button class="btn" id="importBtn">Import</button>
+  <input type="file" id="importFile" accept="application/json,.json" hidden>
+  <button class="btn" id="addGroupBtn">+ Group</button>
+  <button class="btn primary" id="addTaskBtn">+ Task</button>
+</header>
+<div id="main"><div id="scroller"><div id="chart"></div></div><aside id="mine" hidden></aside></div>
+<div id="toast"></div>
+
+<dialog id="meDlg">
+  <form onsubmit="return false">
+    <h2>Who are you?</h2>
+    <div style="color:var(--muted);font-size:13px">Pick your name so the board can show the tasks delegated to you. You can switch any time from the top bar.</div>
+    <div id="meList" style="display:grid;gap:8px"></div>
+  </form>
+</dialog>
+
+<dialog id="taskDlg">
+  <form id="taskForm" onsubmit="return false">
+    <h2 id="taskDlgTitle">Task</h2>
+    <label class="f">Title<input id="tTitle" required maxlength="200"></label>
+    <div class="two">
+      <label class="f">Group (workflow)<select id="tGroup"></select></label>
+      <label class="f">Assigned to<select id="tAsg"></select></label>
+    </div>
+    <div class="two">
+      <label class="f">Start<input type="date" id="tStart" required></label>
+      <label class="f">End<input type="date" id="tEnd" required></label>
+    </div>
+    <div class="two">
+      <label class="f">Status<select id="tStatus">
+        <option value="todo">To do</option><option value="doing">In progress</option>
+        <option value="done">Done</option><option value="blocked">Blocked</option></select></label>
+      <label class="f">Progress (%)<div class="prog"><input type="range" id="tProg" min="0" max="100" step="5"><input type="number" id="tProgN" min="0" max="100"></div></label>
+    </div>
+    <label class="f">Notes<textarea id="tNotes" rows="3" maxlength="2000"></textarea></label>
+    <div class="actions">
+      <button type="button" class="btn danger left" id="tDelete">Delete</button>
+      <button type="button" class="btn" id="tCancel">Cancel</button>
+      <button type="button" class="btn primary" id="tSave">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="groupDlg">
+  <form onsubmit="return false">
+    <h2 id="groupDlgTitle">Group</h2>
+    <label class="f">Name<input id="gName" maxlength="80"></label>
+    <label class="f">Color<input type="color" id="gColor"></label>
+    <div class="actions">
+      <button type="button" class="btn danger left" id="gDelete">Delete group</button>
+      <button type="button" class="btn" id="gCancel">Cancel</button>
+      <button type="button" class="btn primary" id="gSave">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="teamDlg">
+  <form onsubmit="return false">
+    <h2>Team members</h2>
+    <div id="teamRows" style="display:grid;gap:8px"></div>
+    <div class="actions">
+      <button type="button" class="btn" id="mCancel">Cancel</button>
+      <button type="button" class="btn primary" id="mSave">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const toDay = (s) => Math.floor(Date.parse(s + 'T00:00:00Z') / 864e5);
+const fromDay = (n) => new Date(n * 864e5).toISOString().slice(0, 10);
+const fmt = (n) => { const d = new Date(n * 864e5); return MON[d.getUTCMonth()] + ' ' + d.getUTCDate(); };
+const todayDay = () => { const d = new Date(); return toDay(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`); };
+const LEFTW = 430, GREY = '#b9bdd0';
+
+let S = { rev: 0, members: [], groups: [], tasks: [] };
+let R = { start: 0, days: 0 };
+const ui = {
+  dayW: +(localStorage.getItem('gantt.zoom') || 26),
+  filter: null,
+  collapsed: new Set(JSON.parse(localStorage.getItem('gantt.collapsed') || '[]')),
+};
+ui.me = localStorage.getItem('gantt.me');
+ui.mineOpen = localStorage.getItem('gantt.mine') === '1';
+let drag = null;
+
+// ---------------------------------------------------------------- api
+async function api(method, url, body) {
+  const r = await fetch(url, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
+  let data = null;
+  try { data = await r.json(); } catch {}
+  if (!r.ok) throw new Error((data && data.error) || r.statusText);
+  return data;
+}
+async function mutate(method, url, body) {
+  try { S = await api(method, url, body); setSync(true); }
+  catch (e) { toast(e.message); try { S = await api('GET', '/api/state'); } catch {} }
+  render();
+}
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(() => (t.style.display = 'none'), 3500); }
+function setSync(ok) { $('#sync').textContent = ok ? 'synced' : 'offline - retrying'; }
+
+// ---------------------------------------------------------------- helpers
+const member = (id) => S.members.find((m) => m.id === id);
+const me = () => member(ui.me);
+const openCount = (id) => S.tasks.filter((t) => t.status !== 'done' && t.assigneeId === id).length;
+const colorOf = (t) => (member(t.assigneeId) || {}).color || GREY;
+function visibleTasks(gid) {
+  return S.tasks.filter((t) => t.groupId === gid && (ui.filter === null || (ui.filter === 'none' ? !t.assigneeId : t.assigneeId === ui.filter)));
+}
+
+// ---------------------------------------------------------------- render
+function renderChips() {
+  const open = (id) => S.tasks.filter((t) => t.status !== 'done' && (id === 'none' ? !t.assigneeId : t.assigneeId === id)).length;
+  let h = `<span class="chip ${ui.filter === null ? 'on' : ''}" data-f="all">All</span>`;
+  for (const m of S.members) h += `<span class="chip ${ui.filter === m.id ? 'on' : ''}" data-f="${m.id}"><i style="background:${m.color}"></i>${esc(m.name)}${m.id === ui.me ? ' (you)' : ''} <small>${open(m.id)}</small></span>`;
+  h += `<span class="chip ${ui.filter === 'none' ? 'on' : ''}" data-f="none"><i style="background:${GREY}"></i>Unassigned <small>${open('none')}</small></span>`;
+  $('#chips').innerHTML = h;
+}
+
+function render() {
+  renderChips(); renderMe(); renderMine();
+  const dw = ui.dayW, today = todayDay();
+  let mn = today, mx = today + 49;
+  for (const t of S.tasks) { mn = Math.min(mn, toDay(t.start)); mx = Math.max(mx, toDay(t.end)); }
+  mn -= 7; mn -= (((mn + 3) % 7) + 7) % 7; mx += 14;     // align start to a Monday
+  R = { start: mn, days: mx - mn + 1 };
+  const W = R.days * dw;
+
+  // header: months + days/weeks
+  let months = '', cur = null;
+  for (let i = 0; i < R.days; i++) {
+    const d = new Date((mn + i) * 864e5), key = d.getUTCFullYear() * 12 + d.getUTCMonth();
+    if (!cur || cur.key !== key) { if (cur) months += mSpan(cur, dw); cur = { key, i, n: 0, label: MON[d.getUTCMonth()] + ' ' + d.getUTCFullYear() }; }
+    cur.n++;
+  }
+  months += mSpan(cur, dw);
+  let days = '';
+  if (dw >= 20) {
+    for (let i = 0; i < R.days; i++) {
+      const n = mn + i, wd = (n + 3) % 7;
+      days += `<span class="${n === today ? 'td' : wd >= 5 ? 'we' : ''}" style="left:${i * dw}px;width:${dw}px">${new Date(n * 864e5).getUTCDate()}</span>`;
+    }
+  } else {
+    for (let i = 0; i < R.days; i += 7) days += `<span style="left:${i * dw}px;width:${7 * dw}px">${fmt(mn + i)}</span>`;
+  }
+  const grid = dw >= 10
+    ? `repeating-linear-gradient(to right,transparent 0,transparent ${5 * dw}px,rgba(20,30,80,.055) ${5 * dw}px,rgba(20,30,80,.055) ${7 * dw}px),repeating-linear-gradient(to right,#cdd0e2 0,#cdd0e2 1px,transparent 1px,transparent ${7 * dw}px)`
+    : `repeating-linear-gradient(to right,#cdd0e2 0,#cdd0e2 1px,transparent 1px,transparent ${7 * dw}px)`;
+
+  let h = `<div class="hdrwrap">
+    <div class="row h"><div class="lcell">Workflow / task</div><div class="tcell hdr m" style="width:${W}px">${months}</div></div>
+    <div class="row h"><div class="lcell">Assigned to</div><div class="tcell hdr" style="width:${W}px">${days}</div></div></div>`;
+
+  let shown = 0;
+  for (const g of S.groups) {
+    const all = S.tasks.filter((t) => t.groupId === g.id), vis = visibleTasks(g.id);
+    if (ui.filter !== null && !vis.length) continue;
+    shown++;
+    const closed = ui.collapsed.has(g.id);
+    const doneN = all.filter((t) => t.status === 'done').length;
+    const pct = all.length ? Math.round(all.reduce((a, t) => a + t.progress, 0) / all.length) : 0;
+    let sum = '';
+    if (vis.length) {
+      const s = Math.min(...vis.map((t) => toDay(t.start))), e = Math.max(...vis.map((t) => toDay(t.end)));
+      sum = `<div class="sum" style="left:${(s - mn) * dw}px;width:${(e - s + 1) * dw}px;background:${esc(g.color)}"></div>`;
+    }
+    h += `<div class="row group"><div class="lcell">
+        <button class="caret" data-act="toggle" data-id="${g.id}">${closed ? '&#9654;' : '&#9660;'}</button>
+        <span class="dot" style="background:${esc(g.color)}"></span>
+        <span class="gname" data-act="editGroup" data-id="${g.id}" title="Edit group">${esc(g.name)}</span>
+        <span class="meta">${doneN}/${all.length} done &middot; ${pct}%</span>
+        <span style="flex:1"></span>
+        <button class="mini" data-act="addTask" data-id="${g.id}" title="Add task to this group">+ task</button>
+      </div><div class="tcell" style="width:${W}px;background-image:${grid}">${sum}</div></div>`;
+    if (closed) continue;
+    for (const t of vis) {
+      const s = toDay(t.start), e = toDay(t.end), left = (s - mn) * dw, w = (e - s + 1) * dw;
+      const opts = `<option value="">Unassigned</option>` + S.members.map((m) => `<option value="${m.id}" ${m.id === t.assigneeId ? 'selected' : ''}>${esc(m.name)}</option>`).join('');
+      const label = (t.status === 'done' ? '&#10003; ' : '') + esc(t.title);
+      h += `<div class="row"><div class="lcell">
+          <span class="tname ${t.status === 'done' ? 'done' : ''}" data-act="editTask" data-id="${t.id}" title="${esc(t.title)}">${t.assigneeId && t.assigneeId === ui.me ? '<span class="star">&#9733;</span>' : ''}${esc(t.title)}</span>
+          <select class="asg" data-id="${t.id}" title="Delegate">${opts}</select>
+        </div><div class="tcell" style="width:${W}px;background-image:${grid}">
+          <div class="bar ${t.status}${t.assigneeId && t.assigneeId === ui.me ? ' mine' : ''}" data-tid="${t.id}" style="left:${left}px;width:${w}px;background:${colorOf(t)}" title="${esc(t.title)} (${fmt(s)} - ${fmt(e)}, ${t.progress}%)">
+            <div class="fill" style="width:${t.progress}%"></div><div class="lbl">${w > 70 ? label : ''}</div><div class="hl"></div><div class="hr"></div>
+          </div></div></div>`;
+    }
+  }
+  if (!shown) h += `<div class="empty">${S.groups.length ? 'No tasks match this filter.' : 'No groups yet. Click "+ Group" to create your first workflow.'}</div>`;
+  h += `<div id="today" style="left:${LEFTW + (today - mn) * dw + dw / 2}px"></div>`;
+  $('#chart').innerHTML = h;
+}
+function mSpan(c, dw) { return `<span style="left:${c.i * dw}px;width:${c.n * dw}px">${c.n * dw > 60 ? c.label : ''}</span>`; }
+
+// ---------------------------------------------------------------- interactions
+const chart = $('#chart');
+chart.addEventListener('click', (e) => {
+  const a = e.target.closest('[data-act]'); if (!a) return;
+  const id = a.dataset.id;
+  if (a.dataset.act === 'toggle') {
+    ui.collapsed.has(id) ? ui.collapsed.delete(id) : ui.collapsed.add(id);
+    localStorage.setItem('gantt.collapsed', JSON.stringify([...ui.collapsed])); render();
+  } else if (a.dataset.act === 'editGroup') openGroup(id);
+  else if (a.dataset.act === 'addTask') openTask(null, id);
+  else if (a.dataset.act === 'editTask') openTask(id);
+});
+chart.addEventListener('change', (e) => {
+  if (e.target.classList.contains('asg')) mutate('PATCH', '/api/tasks/' + e.target.dataset.id, { assigneeId: e.target.value || null });
+});
+$('#chips').addEventListener('click', (e) => {
+  const c = e.target.closest('.chip'); if (!c) return;
+  const f = c.dataset.f; ui.filter = f === 'all' || ui.filter === f ? null : f; render();
+});
+
+chart.addEventListener('pointerdown', (e) => {
+  const bar = e.target.closest('.bar'); if (!bar || e.button !== 0) return;
+  const t = S.tasks.find((x) => x.id === bar.dataset.tid); if (!t) return;
+  const mode = e.target.classList.contains('hl') ? 'l' : e.target.classList.contains('hr') ? 'r' : 'm';
+  drag = { t, bar, mode, x0: e.clientX, s: toDay(t.start), e: toDay(t.end), ns: toDay(t.start), ne: toDay(t.end), moved: false };
+  bar.setPointerCapture(e.pointerId); e.preventDefault();
+});
+chart.addEventListener('pointermove', (e) => {
+  if (!drag) return;
+  const dx = e.clientX - drag.x0; if (Math.abs(dx) > 3) drag.moved = true;
+  const dd = Math.round(dx / ui.dayW);
+  let s = drag.s, en = drag.e;
+  if (drag.mode === 'm') { s += dd; en += dd; } else if (drag.mode === 'l') s = Math.min(s + dd, en); else en = Math.max(en + dd, s);
+  drag.ns = s; drag.ne = en;
+  drag.bar.style.left = (s - R.start) * ui.dayW + 'px';
+  drag.bar.style.width = (en - s + 1) * ui.dayW + 'px';
+  drag.bar.title = `${drag.t.title} (${fmt(s)} - ${fmt(en)})`;
+});
+chart.addEventListener('pointerup', (e) => {
+  if (!drag) return;
+  const d = drag; drag = null;
+  if (!d.moved) { openTask(d.t.id); return; }
+  if (d.ns === d.s && d.ne === d.e) { render(); return; }
+  d.t.start = fromDay(d.ns); d.t.end = fromDay(d.ne); render();      // optimistic
+  mutate('PATCH', '/api/tasks/' + d.t.id, { start: d.t.start, end: d.t.end });
+});
+chart.addEventListener('pointercancel', () => { if (drag) { drag = null; render(); } });
+
+// header buttons
+$('#zoom').value = String(ui.dayW);
+if ($('#zoom').value !== String(ui.dayW)) { ui.dayW = 26; $('#zoom').value = '26'; }
+$('#zoom').addEventListener('change', (e) => { ui.dayW = +e.target.value; localStorage.setItem('gantt.zoom', ui.dayW); render(); scrollToToday(); });
+$('#todayBtn').onclick = scrollToToday;
+function scrollToToday() { const sc = $('#scroller'); sc.scrollLeft = Math.max(0, (todayDay() - R.start) * ui.dayW - 80); }
+$('#addTaskBtn').onclick = () => openTask(null, S.groups[0] && S.groups[0].id);
+$('#addGroupBtn').onclick = () => openGroup(null);
+$('#teamBtn').onclick = openTeam;
+$('#exportBtn').onclick = () => { location.href = '/api/export'; };
+$('#importBtn').onclick = () => $('#importFile').click();
+$('#importFile').addEventListener('change', async (e) => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  let data; try { data = JSON.parse(await f.text()); } catch { return toast('That file is not valid JSON'); }
+  if (Array.isArray(data.members) && Array.isArray(data.tasks) && Array.isArray(data.groups)) {
+    if (!confirm('This is a full backup. Replace the whole board with it?')) return;
+    await mutate('PUT', '/api/state', data);
+  } else if (Array.isArray(data.groups)) {
+    try { const r = await api('POST', '/api/bulk', data); S = r; render(); toast(`Added ${r.added} task(s)`); } catch (err) { toast(err.message); }
+  } else toast('Unrecognized file format');
+});
+
+// ---------------------------------------------------------------- task dialog
+let editing = null;
+function openTask(id, gid) {
+  const t = id ? S.tasks.find((x) => x.id === id) : null; editing = t;
+  if (!t && !S.groups.length) return toast('Create a group first');
+  $('#taskDlgTitle').textContent = t ? 'Edit task' : 'New task';
+  $('#tGroup').innerHTML = S.groups.map((g) => `<option value="${g.id}">${esc(g.name)}</option>`).join('');
+  $('#tAsg').innerHTML = `<option value="">Unassigned</option>` + S.members.map((m) => `<option value="${m.id}">${esc(m.name)}</option>`).join('');
+  const td = todayDay();
+  $('#tTitle').value = t ? t.title : '';
+  $('#tGroup').value = t ? t.groupId : gid || S.groups[0].id;
+  $('#tAsg').value = t ? t.assigneeId || '' : '';
+  $('#tStart').value = t ? t.start : fromDay(td);
+  $('#tEnd').value = t ? t.end : fromDay(td + 4);
+  $('#tStatus').value = t ? t.status : 'todo';
+  $('#tProg').value = $('#tProgN').value = t ? t.progress : 0;
+  $('#tNotes').value = t ? t.notes : '';
+  $('#tDelete').style.display = t ? '' : 'none';
+  $('#taskDlg').showModal(); $('#tTitle').focus();
+}
+$('#tStart').addEventListener('change', () => { if ($('#tEnd').value < $('#tStart').value) $('#tEnd').value = $('#tStart').value; });
+$('#tProg').addEventListener('input', () => ($('#tProgN').value = $('#tProg').value));
+$('#tProgN').addEventListener('input', () => ($('#tProg').value = $('#tProgN').value));
+$('#tStatus').addEventListener('change', () => { if ($('#tStatus').value === 'done') $('#tProg').value = $('#tProgN').value = 100; });
+$('#tCancel').onclick = () => $('#taskDlg').close();
+$('#tSave').onclick = async () => {
+  if (!$('#taskForm').reportValidity()) return;
+  const body = {
+    title: $('#tTitle').value, groupId: $('#tGroup').value, assigneeId: $('#tAsg').value || null,
+    start: $('#tStart').value, end: $('#tEnd').value, status: $('#tStatus').value,
+    progress: +$('#tProgN').value || 0, notes: $('#tNotes').value,
+  };
+  $('#taskDlg').close();
+  await (editing ? mutate('PATCH', '/api/tasks/' + editing.id, body) : mutate('POST', '/api/tasks', body));
+};
+$('#tDelete').onclick = async () => {
+  if (!confirm('Delete this task?')) return;
+  $('#taskDlg').close(); await mutate('DELETE', '/api/tasks/' + editing.id);
+};
+
+// ---------------------------------------------------------------- group dialog
+let editingGroup = null;
+function openGroup(id) {
+  const g = id ? S.groups.find((x) => x.id === id) : null; editingGroup = g;
+  $('#groupDlgTitle').textContent = g ? 'Edit group' : 'New group (workflow)';
+  $('#gName').value = g ? g.name : '';
+  $('#gColor').value = g ? g.color : ['#5271FF', '#FF7A1F', '#0097B2', '#FF5757', '#7F4FFF', '#38B6FF', '#5CE1E6'][S.groups.length % 7];
+  $('#gDelete').style.display = g ? '' : 'none';
+  $('#groupDlg').showModal(); $('#gName').focus();
+}
+$('#gCancel').onclick = () => $('#groupDlg').close();
+$('#gSave').onclick = async () => {
+  const name = $('#gName').value.trim(); if (!name) return toast('Name is required');
+  $('#groupDlg').close();
+  const body = { name, color: $('#gColor').value };
+  await (editingGroup ? mutate('PATCH', '/api/groups/' + editingGroup.id, body) : mutate('POST', '/api/groups', body));
+};
+$('#gDelete').onclick = async () => {
+  const n = S.tasks.filter((t) => t.groupId === editingGroup.id).length;
+  if (!confirm(`Delete "${editingGroup.name}"${n ? ' and its ' + n + ' task(s)' : ''}?`)) return;
+  $('#groupDlg').close(); await mutate('DELETE', '/api/groups/' + editingGroup.id);
+};
+
+// ---------------------------------------------------------------- team dialog
+function openTeam() {
+  $('#teamRows').innerHTML = S.members.map((m) => `<div class="team-row"><input data-id="${m.id}" class="mn" value="${esc(m.name)}" maxlength="40"><input type="color" data-id="${m.id}" class="mc" value="${m.color}"></div>`).join('');
+  $('#teamDlg').showModal();
+}
+$('#mCancel').onclick = () => $('#teamDlg').close();
+$('#mSave').onclick = async () => {
+  const members = S.members.map((m) => ({
+    id: m.id,
+    name: document.querySelector(`.mn[data-id="${m.id}"]`).value,
+    color: document.querySelector(`.mc[data-id="${m.id}"]`).value,
+  }));
+  $('#teamDlg').close(); await mutate('PATCH', '/api/members', { members });
+};
+
+// ---------------------------------------------------------------- identity + my tasks
+function renderMe() {
+  const m = me();
+  $('#meBtn').innerHTML = m ? `<span class="dot" style="background:${m.color};display:inline-block;vertical-align:-2px;margin-right:6px"></span>${esc(m.name)} (you)` : 'Who are you?';
+  const n = m ? openCount(m.id) : 0;
+  $('#mineCount').textContent = n ? n : '';
+  $('#mineBtn').classList.toggle('primary', ui.mineOpen);
+}
+function openMe() {
+  $('#meList').innerHTML = S.members.map((m) => `<button type="button" class="who" data-id="${m.id}"><i style="background:${m.color}"></i>${esc(m.name)}<small>${openCount(m.id)} open</small></button>`).join('');
+  $('#meDlg').showModal();
+}
+$('#meBtn').onclick = openMe;
+$('#meList').addEventListener('click', (e) => {
+  const b = e.target.closest('.who'); if (!b) return;
+  const first = !me();
+  ui.me = b.dataset.id; localStorage.setItem('gantt.me', ui.me);
+  if (first) { ui.mineOpen = true; localStorage.setItem('gantt.mine', '1'); }
+  $('#meDlg').close(); render();
+});
+$('#meDlg').addEventListener('cancel', (e) => { if (!me()) e.preventDefault(); });
+$('#mineBtn').onclick = () => { ui.mineOpen = !ui.mineOpen; localStorage.setItem('gantt.mine', ui.mineOpen ? '1' : '0'); render(); };
+
+function dueLabel(t, td) {
+  const e = toDay(t.end), s = toDay(t.start);
+  if (e < td) return `<b style="color:#d11">overdue by ${td - e}d</b>`;
+  if (s > td) return `starts in ${s - td}d`;
+  const left = e - td; return left === 0 ? '<b>due today</b>' : `due in ${left}d`;
+}
+function mineCard(t, td, od) {
+  const g = S.groups.find((x) => x.id === t.groupId) || { name: '', color: GREY };
+  return `<div class="mt ${od ? 'od' : ''}"><input type="checkbox" data-act="chk" data-id="${t.id}" ${t.status === 'done' ? 'checked' : ''} title="Mark done">
+    <div class="tt" data-act="open" data-id="${t.id}">${esc(t.title)}</div>
+    <div class="ln"><span><i class="gd" style="background:${esc(g.color)}"></i>${esc(g.name)}</span><span>${fmt(toDay(t.start))} - ${fmt(toDay(t.end))}</span>${t.status === 'done' ? '' : '<span>' + dueLabel(t, td) + '</span>'}</div>
+    <div class="ln"><select data-act="st" data-id="${t.id}">${[['todo','To do'],['doing','In progress'],['done','Done'],['blocked','Blocked']].map(([v,l]) => `<option value="${v}" ${t.status === v ? 'selected' : ''}>${l}</option>`).join('')}</select><span>${t.progress}%</span></div></div>`;
+}
+function renderMine() {
+  const el = $('#mine'); el.hidden = !ui.mineOpen; if (!ui.mineOpen) return;
+  const m = me(); if (!m) { el.innerHTML = '<p>Pick who you are first.</p>'; return; }
+  const td = todayDay();
+  const mine = S.tasks.filter((t) => t.assigneeId === m.id);
+  const open = mine.filter((t) => t.status !== 'done').sort((a, b) => a.end.localeCompare(b.end) || a.start.localeCompare(b.start));
+  const over = open.filter((t) => toDay(t.end) < td), rest = open.filter((t) => toDay(t.end) >= td);
+  const done = mine.filter((t) => t.status === 'done');
+  const free = S.tasks.filter((t) => !t.assigneeId && t.status !== 'done');
+  let h = `<h3><span class="dot" style="background:${m.color}"></span>${esc(m.name)}'s tasks</h3>
+    <div class="sub">${open.length} open${over.length ? ' &middot; <b style="color:#d11">' + over.length + ' overdue</b>' : ''} &middot; ${done.length} done</div>`;
+  if (!mine.length) h += '<p style="color:var(--muted)">Nothing is delegated to you yet. Someone can assign you a task from its dropdown, or take an unassigned one below.</p>';
+  if (over.length) h += '<h4 class="od">Overdue</h4>' + over.map((t) => mineCard(t, td, true)).join('');
+  if (rest.length) h += '<h4>Open</h4>' + rest.map((t) => mineCard(t, td, false)).join('');
+  if (done.length) h += '<h4>Done</h4>' + done.map((t) => mineCard(t, td, false)).join('');
+  if (free.length) {
+    h += `<h4>Unassigned (${free.length})</h4>` + free.map((t) => `<div class="mt free"><span></span><div class="tt" data-act="open" data-id="${t.id}">${esc(t.title)}</div>
+      <div class="ln"><span>${fmt(toDay(t.start))} - ${fmt(toDay(t.end))}</span><button class="mini" data-act="take" data-id="${t.id}">Take it</button></div></div>`).join('');
+  }
+  el.innerHTML = h;
+}
+$('#mine').addEventListener('click', (e) => {
+  const a = e.target.closest('[data-act]'); if (!a || a.tagName === 'SELECT' || a.type === 'checkbox') return;
+  if (a.dataset.act === 'open') openTask(a.dataset.id);
+  else if (a.dataset.act === 'take') mutate('PATCH', '/api/tasks/' + a.dataset.id, { assigneeId: ui.me });
+});
+$('#mine').addEventListener('change', (e) => {
+  const a = e.target, id = a.dataset.id; if (!id) return;
+  const t = S.tasks.find((x) => x.id === id); if (!t) return;
+  if (a.dataset.act === 'chk') mutate('PATCH', '/api/tasks/' + id, a.checked ? { status: 'done', progress: 100 } : { status: t.progress > 0 ? 'doing' : 'todo' });
+  else if (a.dataset.act === 'st') mutate('PATCH', '/api/tasks/' + id, a.value === 'done' ? { status: 'done', progress: 100 } : { status: a.value });
+});
+
+// ---------------------------------------------------------------- live sync (shared board)
+async function poll() {
+  if (drag || document.hidden || document.querySelector('dialog[open]')) return;
+  try {
+    const r = await api('GET', '/api/state?rev=' + S.rev);
+    setSync(true);
+    if (!r.unchanged) {
+      const had = new Set(S.tasks.filter((t) => t.assigneeId === ui.me).map((t) => t.id));
+      S = r;
+      const fresh = S.tasks.filter((t) => ui.me && t.assigneeId === ui.me && !had.has(t.id));
+      render();
+      if (fresh.length) toast('Newly assigned to you: ' + fresh.map((t) => t.title).join(', '));
+    }
+  } catch { setSync(false); }
+}
+setInterval(poll, 4000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
+
+(async () => {
+  try { S = await api('GET', '/api/state'); setSync(true); } catch (e) { setSync(false); toast('Could not load the board'); }
+  render(); scrollToToday();
+  if (!me() && S.members.length) openMe();
+})();
+</script>
+</body>
+</html>

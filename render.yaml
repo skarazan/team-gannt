@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: team-gantt
+    runtime: node
+    plan: free            # free = data resets on restart unless you use Supabase (see README)
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: TEAM_PASSWORD        # shared password for the whole team (strongly recommended)
+        sync: false
+      - key: SUPABASE_URL         # optional, for durable storage on the free plan
+        sync: false
+      - key: SUPABASE_SERVICE_KEY # optional, server-side only, never put this in the browser
+        sync: false
