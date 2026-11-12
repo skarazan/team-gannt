@@ -5,6 +5,8 @@ A shared, interactive Gantt chart for the team. One board, many workflow groups,
 **In the app**
 - Drag a bar to move it, drag either edge to resize, click it to edit (title, group, owner, dates, progress, status, notes).
 - **Who are you?** On first visit each person picks their name (remembered in that browser; switch from the top bar). Your tasks get a gold outline and a star on the chart, and the **My tasks** panel lists what is delegated to you: overdue first, tick a box to mark done, change status, or "Take it" on an unassigned task. You get a notice when someone assigns you something. This is a name picker for convenience, not a security login; the shared password is what keeps outsiders out.
+- **Dependencies:** each task shows READY (everything it depends on is done) or WAITS n. The "Ready now" chip filters to startable work.
+- **Handoff notes:** when you finish a task, the board asks what changed from the plan. Notes (optionally marked as a warning) appear at the top of every task that depends on it, and a warning puts a red marker on those rows.
 - Delegate from the dropdown on each row. Click a person chip at the top to see only their work.
 - `+ Group` creates a workflow, `+ task` on a group row adds a task to it, the caret collapses a group.
 - `Team` renames the five members and changes their colors. Zoom: Days / Weeks / Months.

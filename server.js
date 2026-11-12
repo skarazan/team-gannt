@@ -191,7 +191,7 @@ app.delete('/api/groups/:id', wrap(async (req, res) => {
 
 // tasks
 app.post('/api/tasks', wrap(async (req, res) => {
-  const t = { id: nextTaskId(), groupId: null, title: '', assigneeId: null, start: '', end: '', progress: 0, status: 'todo', notes: '', deps: [] };
+  const t = { id: nextTaskId(), groupId: null, title: '', assigneeId: null, start: '', end: '', progress: 0, status: 'todo', notes: '', deps: [], log: [] };
   const input = { ...req.body };
   if (!('end' in input) && isDate(input.start)) input.end = input.start;
   for (const k of ['groupId', 'title', 'start', 'end']) if (!(k in input)) return bad(res, k + ' is required');
@@ -209,6 +209,37 @@ app.patch('/api/tasks/:id', wrap(async (req, res) => {
   Object.assign(t, copy);
   await done(res);
 }));
+// handoff notes: what changed / warnings for whoever picks up dependent tasks
+const NOTE_KINDS = ['note', 'warning'];
+function cleanLog(list) {
+  if (!Array.isArray(list)) return [];
+  return list.slice(-100).map((n) => ({
+    id: str(n.id, 30) || uid('n_'),
+    authorId: n.authorId && state.members.some((m) => m.id === n.authorId) ? n.authorId : null,
+    kind: NOTE_KINDS.includes(n.kind) ? n.kind : 'note',
+    text: str(n.text, 2000),
+    at: typeof n.at === 'string' && !isNaN(Date.parse(n.at)) ? n.at : new Date().toISOString(),
+  })).filter((n) => n.text);
+}
+app.post('/api/tasks/:id/notes', wrap(async (req, res) => {
+  const t = state.tasks.find((x) => x.id === req.params.id);
+  if (!t) return res.status(404).json({ error: 'Not found' });
+  const text = str(req.body.text, 2000);
+  if (!text) return bad(res, 'Note text is required');
+  const kind = NOTE_KINDS.includes(req.body.kind) ? req.body.kind : 'note';
+  const authorId = req.body.authorId && state.members.some((m) => m.id === req.body.authorId) ? req.body.authorId : null;
+  t.log = t.log || [];
+  if (t.log.length >= 100) return bad(res, 'This task already has 100 notes');
+  t.log.push({ id: uid('n_'), authorId, kind, text, at: new Date().toISOString() });
+  await done(res);
+}));
+app.delete('/api/tasks/:id/notes/:nid', wrap(async (req, res) => {
+  const t = state.tasks.find((x) => x.id === req.params.id);
+  if (!t || !(t.log || []).some((n) => n.id === req.params.nid)) return res.status(404).json({ error: 'Not found' });
+  t.log = t.log.filter((n) => n.id !== req.params.nid);
+  await done(res);
+}));
+
 app.delete('/api/tasks/:id', wrap(async (req, res) => {
   if (!state.tasks.some((x) => x.id === req.params.id)) return res.status(404).json({ error: 'Not found' });
   state.tasks = state.tasks.filter((x) => x.id !== req.params.id);
@@ -254,7 +285,7 @@ app.post('/api/bulk', wrap(async (req, res) => {
           if (!m) throw new Error(`Unknown assignee "${ti.assignee}" (task "${ti.title}")`);
           input.assigneeId = m.id;
         }
-        const t = { id: nextTaskId(), groupId: g.id, title: '', assigneeId: null, start: '', end: '', progress: 0, status: 'todo', notes: '', deps: [] };
+        const t = { id: nextTaskId(), groupId: g.id, title: '', assigneeId: null, start: '', end: '', progress: 0, status: 'todo', notes: '', deps: [], log: [] };
         const err = applyTask(t, input);
         if (err) throw new Error(`${err} (task "${ti.title}")`);
         state.tasks.push(t); added++;
@@ -279,8 +310,9 @@ app.put('/api/state', wrap(async (req, res) => {
     for (const m of b.members) next.members.push({ id: str(m.id, 20), name: str(m.name, 40) || 'Member', color: isColor(m.color) ? m.color : PALETTE[0] });
     for (const g of b.groups) next.groups.push({ id: str(g.id, 30), name: str(g.name, 80) || 'Group', color: isColor(g.color) ? g.color : PALETTE[0] });
     for (const x of b.tasks) {
-      const t = { id: str(x.id, 30) || uid('t_'), groupId: null, title: '', assigneeId: null, start: '', end: '', progress: 0, status: 'todo', notes: '', deps: [] };
+      const t = { id: str(x.id, 30) || uid('t_'), groupId: null, title: '', assigneeId: null, start: '', end: '', progress: 0, status: 'todo', notes: '', deps: [], log: [] };
       skipDepCheck = true; const err = applyTask(t, x); skipDepCheck = false;
+      t.log = cleanLog(x.log);
       if (err) throw new Error(err + ' (task "' + str(x.title) + '")');
       next.tasks.push(t);
     }

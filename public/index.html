@@ -161,6 +161,27 @@
   .readyline.ready { background:#e6f8ee; } .readyline.wait { background:#fff7e0; } .readyline.done { background:#eef0f6; color:var(--muted); }
   .ticket .tref, .dep .tref { font:700 12px ui-monospace, Menlo, monospace; background:#eef0ff; border:1.5px solid #5271FF; color:#2b3fb8; border-radius:5px; padding:0 5px; cursor:pointer; }
   .mt .wt { grid-column:2; font-size:12px; color:#8a5a00; }
+  .hn-up { border:2px solid #111; border-radius:10px; background:#fff7e0; padding:10px 12px; margin-bottom:14px; }
+  .hn-up.calm { background:#eef6ff; }
+  .hn-up h5, .hn h5 { margin:0 0 8px; font-size:12px; letter-spacing:.06em; text-transform:uppercase; }
+  .hn { margin-top:18px; border-top:2px dashed #cdd0e2; padding-top:14px; }
+  .note { border:2px solid #111; border-radius:8px; background:#fff; padding:7px 10px; margin-bottom:8px; font-size:14px; line-height:1.45; }
+  .note.warning { border-color:#d11; background:#fff1f1; }
+  .note .nm { font-size:11px; color:var(--muted); margin-bottom:3px; display:flex; gap:6px; align-items:center; }
+  .note .nm b { color:var(--ink); }
+  .note .nm .x { margin-left:auto; border:0; background:none; cursor:pointer; color:var(--muted); font-size:15px; line-height:1; }
+  .note .nm .x:hover { color:#d11; }
+  .note .tx { white-space:pre-wrap; overflow-wrap:anywhere; }
+  .wtag { font-weight:800; color:#d11; }
+  .hn-comp { display:grid; gap:6px; }
+  .hn-comp textarea { width:100%; min-height:70px; border:2px solid #111; border-radius:8px; padding:8px 10px; font:inherit; font-size:14px; resize:vertical; }
+  .hn-comp .row2 { display:flex; align-items:center; gap:10px; }
+  .hn-comp label { font-size:13px; font-weight:700; display:flex; gap:6px; align-items:center; cursor:pointer; }
+  .hn-comp .row2 .btn { margin-left:auto; }
+  .hn-ask { border:2px solid #111; border-radius:10px; background:#e6f8ee; padding:8px 10px; font-size:13px; font-weight:600; }
+  .hn-ask[hidden] { display:none; }
+  .warnflag { flex:none; font-size:13px; cursor:default; }
+  .mt .wn { grid-column:2; font-size:12px; color:#d11; font-weight:700; }
   #toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:#111; color:#fff; padding:9px 16px; border-radius:8px; font-weight:600; display:none; z-index:50; max-width:90vw; }
 </style>
 </head>
@@ -204,9 +225,19 @@
     </div>
     <div class="td-body">
       <div class="td-main">
+        <div id="tUp"></div>
         <div class="td-tabs"><button type="button" id="tViewBtn" class="on">Ticket</button><button type="button" id="tEditBtn">Edit notes</button></div>
         <div class="ticket" id="tView"></div>
         <div id="tEditWrap" hidden><textarea id="tNotes" maxlength="2000" placeholder="GOAL: ...&#10;STEPS:&#10;1. ...&#10;DONE WHEN:&#10;- ...&#10;DEPENDS ON: ...&#10;NOTES: ..."></textarea><div class="td-count" id="tCount"></div></div>
+        <div class="hn" id="tHn">
+          <h5>Handoff notes <span style="font-weight:500;text-transform:none;letter-spacing:0;color:var(--muted)">(shown on every task that depends on this one)</span></h5>
+          <div class="hn-ask" id="tHnAsk" hidden></div>
+          <div id="tLog"></div>
+          <div class="hn-comp" id="tComp">
+            <textarea id="tNoteText" maxlength="2000" placeholder="What changed from the plan? Anything the next person should know? (renamed files, different API, known bugs, shortcuts taken)"></textarea>
+            <div class="row2"><label><input type="checkbox" id="tNoteWarn"> &#9888; Mark as warning</label><button type="button" class="btn" id="tNoteAdd">Add note</button></div>
+          </div>
+        </div>
       </div>
       <div class="td-side">
         <label class="f">Assigned to<select id="tAsg"></select></label>
@@ -304,6 +335,9 @@ const isReady = (t) => t.status !== 'done' && !blockersOf(t).length;
 const unblocksOf = (t) => S.tasks.filter((x) => (x.deps || []).includes(t.id));
 const SDOT = { todo: '#ffffff', doing: '#F2B705', done: '#2EBD6B', blocked: '#FF5757' };
 const keyOrTitle = (t) => taskKey(t) || t.title.slice(0, 20);
+const upstreamNotes = (t) => depsOf(t).flatMap((d) => (d.log || []).map((n) => ({ ...n, from: d })));
+const upstreamWarnings = (t) => upstreamNotes(t).filter((n) => n.kind === 'warning');
+const whenStr = (iso) => { const d = new Date(iso); return MON[d.getMonth()] + ' ' + d.getDate() + ', ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
 const openCount = (id) => S.tasks.filter((t) => t.status !== 'done' && t.assigneeId === id).length;
 const colorOf = (t) => (member(t.assigneeId) || {}).color || GREY;
 function visibleTasks(gid) {
@@ -383,6 +417,7 @@ function render() {
       const label = (t.status === 'done' ? '&#10003; ' : '') + esc(t.title);
       h += `<div class="row"><div class="lcell">
           <span class="tname ${t.status === 'done' ? 'done' : ''}" data-act="editTask" data-id="${t.id}" title="${esc(t.title)}">${t.assigneeId && t.assigneeId === ui.me ? '<span class="star">&#9733;</span>' : ''}${taskKey(t) ? '<span class="rk">' + taskKey(t) + '</span>' : ''}${esc(t.title)}</span>
+          ${t.status !== 'done' && upstreamWarnings(t).length ? `<span class="warnflag" title="${esc(upstreamWarnings(t).length + ' warning(s) from tasks this depends on:\n' + upstreamWarnings(t).map((n) => keyOrTitle(n.from) + ': ' + n.text.slice(0, 120)).join('\n'))}">&#9888;</span>` : ''}
           ${stBadge(t)}
           <select class="asg" data-id="${t.id}" title="Delegate">${opts}</select>
         </div><div class="tcell" style="width:${W}px;background-image:${grid}">
@@ -495,7 +530,7 @@ function openTask(id, gid) {
   $('#tNotes').value = t ? t.notes : '';
   $('#tKey').textContent = t ? taskKey(t) : '';
   editDeps = t ? [...(t.deps || [])] : [];
-  renderDeps();
+  renderDeps(); renderNotes(); $('#tHnAsk').hidden = true; $('#tNoteText').value = ''; $('#tNoteWarn').checked = false;
   $('#tDelete').style.display = t ? '' : 'none';
   setNotesMode(t && t.notes ? 'view' : 'edit');
   updateMeta();
@@ -535,7 +570,49 @@ $('#taskDlg').addEventListener('click', (e) => {
   const rm = e.target.closest('[data-rm]'); if (rm) { editDeps = editDeps.filter((x) => x !== rm.dataset.rm); renderDeps(); return; }
   const op = e.target.closest('[data-open]'); if (op) openTask(op.dataset.open);
 });
-$('#tStatus').addEventListener('change', renderDeps);
+$('#tStatus').addEventListener('change', () => { renderDeps(); if ($('#tStatus').value === 'done' && editing && editing.status !== 'done') askHandoff(); });
+function noteHtml(n, opts = {}) {
+  const who = (member(n.authorId) || {}).name || 'Someone';
+  const from = opts.from ? `<a class="tref" data-open="${n.from.id}">${esc(keyOrTitle(n.from))}</a>` : '';
+  return `<div class="note ${n.kind}"><div class="nm">${from}${n.kind === 'warning' ? '<span class="wtag">&#9888; WARNING</span>' : ''}<b>${esc(who)}</b><span>${whenStr(n.at)}</span>${opts.del ? `<button type="button" class="x" data-delnote="${n.id}" title="Delete note">&times;</button>` : ''}</div><div class="tx">${linkify(esc(n.text))}</div></div>`;
+}
+function renderNotes() {
+  const t = editing && taskById(editing.id);
+  // notes from upstream tasks (what this task depends on)
+  const up = t ? upstreamNotes(t) : editDeps.map(taskById).filter(Boolean).flatMap((d) => (d.log || []).map((n) => ({ ...n, from: d })));
+  up.sort((a, b) => (b.kind === 'warning') - (a.kind === 'warning') || b.at.localeCompare(a.at));
+  const nw = up.filter((n) => n.kind === 'warning').length;
+  $('#tUp').innerHTML = up.length ? `<div class="hn-up ${nw ? '' : 'calm'}"><h5>${nw ? '&#9888; ' + nw + ' warning' + (nw > 1 ? 's' : '') + ' &middot; ' : ''}Notes from tasks this depends on</h5>${up.map((n) => noteHtml(n, { from: true })).join('')}</div>` : '';
+  // this task's own notes
+  const own = t ? [...(t.log || [])].sort((a, b) => a.at.localeCompare(b.at)) : [];
+  $('#tLog').innerHTML = own.length ? own.map((n) => noteHtml(n, { del: true })).join('') : '<p class="empty" style="color:var(--muted);font-size:13px;margin:0 0 8px">No handoff notes yet.</p>';
+  $('#tComp').hidden = !t;
+  if (!t) $('#tLog').innerHTML = '<p style="color:var(--muted);font-size:13px">Save the task first, then you can add handoff notes.</p>';
+}
+function askHandoff() {
+  const t = editing && taskById(editing.id); if (!t) return;
+  const ub = unblocksOf(t);
+  const a = $('#tHnAsk');
+  a.innerHTML = '&#10003; Marked done. ' + (ub.length ? 'Leave a note for whoever picks up ' + ub.map((d) => `<a class="tref" data-open="${d.id}">${esc(keyOrTitle(d))}</a>`).join(', ') + ': what changed from the plan, or any warnings?' : 'Anything worth noting for the team?');
+  a.hidden = false;
+  $('#tHn').scrollIntoView({ block: 'start' });
+  $('#tNoteText').focus();
+}
+$('#tNoteAdd').onclick = async () => {
+  const t = editing && taskById(editing.id); if (!t) return;
+  const text = $('#tNoteText').value.trim(); if (!text) return toast('Write something first');
+  const kind = $('#tNoteWarn').checked ? 'warning' : 'note';
+  try {
+    S = await api('POST', `/api/tasks/${t.id}/notes`, { text, kind, authorId: ui.me || null });
+    $('#tNoteText').value = ''; $('#tNoteWarn').checked = false; $('#tHnAsk').hidden = true;
+    editing = taskById(t.id); renderNotes(); render(); toast(kind === 'warning' ? 'Warning added: dependent tasks will show it' : 'Note added');
+  } catch (e) { toast(e.message); }
+};
+$('#tLog').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-delnote]'); if (!b || !editing) return;
+  if (!confirm('Delete this note?')) return;
+  try { S = await api('DELETE', `/api/tasks/${editing.id}/notes/${b.dataset.delnote}`); editing = taskById(editing.id); renderNotes(); render(); } catch (err) { toast(err.message); }
+});
 function fitTitle() { const el = $('#tTitle'); el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
 $('#tTitle').addEventListener('input', fitTitle);
 $('#tTitle').addEventListener('keydown', (e) => { if (e.key === 'Enter') e.preventDefault(); });
@@ -607,8 +684,11 @@ $('#tSave').onclick = async () => {
     start: $('#tStart').value, end: $('#tEnd').value, status: $('#tStatus').value,
     progress: +$('#tProgN').value || 0, notes: $('#tNotes').value, deps: editDeps,
   };
+  const justDone = editing && editing.status !== 'done' && body.status === 'done';
+  const id = editing && editing.id;
   $('#taskDlg').close();
   await (editing ? mutate('PATCH', '/api/tasks/' + editing.id, body) : mutate('POST', '/api/tasks', body));
+  if (justDone && !(taskById(id).log || []).length) { openTask(id); askHandoff(); }
 };
 $('#tDelete').onclick = async () => {
   if (!confirm('Delete this task?')) return;
@@ -686,6 +766,7 @@ function mineCard(t, td, od) {
   const g = S.groups.find((x) => x.id === t.groupId) || { name: '', color: GREY };
   return `<div class="mt ${od ? 'od' : ''}"><input type="checkbox" data-act="chk" data-id="${t.id}" ${t.status === 'done' ? 'checked' : ''} title="Mark done">
     <div class="tt" data-act="open" data-id="${t.id}">${taskKey(t) ? '<span class="rk">' + taskKey(t) + '</span>' : ''}${esc(t.title)}</div>
+    ${t.status !== 'done' && upstreamWarnings(t).length ? `<div class="wn">&#9888; ${upstreamWarnings(t).length} warning${upstreamWarnings(t).length > 1 ? 's' : ''} from ${[...new Set(upstreamWarnings(t).map((n) => keyOrTitle(n.from)))].join(', ')}: open to read</div>` : ''}
     ${t.status !== 'done' && blockersOf(t).length ? '<div class="wt">Waiting on ' + blockersOf(t).map((d) => `<a class="tref" data-act="open" data-id="${d.id}">${esc(keyOrTitle(d))}</a> (${esc((member(d.assigneeId) || {}).name || 'unassigned')})`).join(', ') + '</div>' : ''}
     <div class="ln"><span><i class="gd" style="background:${esc(g.color)}"></i>${esc(g.name)}</span><span>${fmt(toDay(t.start))} - ${fmt(toDay(t.end))}</span>${t.status === 'done' ? '' : '<span>' + dueLabel(t, td) + '</span>'}</div>
     <div class="ln"><select data-act="st" data-id="${t.id}">${[['todo','To do'],['doing','In progress'],['done','Done'],['blocked','Blocked']].map(([v,l]) => `<option value="${v}" ${t.status === v ? 'selected' : ''}>${l}</option>`).join('')}</select><span>${t.progress}%</span></div></div>`;
@@ -720,7 +801,10 @@ $('#mine').addEventListener('click', (e) => {
 $('#mine').addEventListener('change', (e) => {
   const a = e.target, id = a.dataset.id; if (!id) return;
   const t = S.tasks.find((x) => x.id === id); if (!t) return;
-  if (a.dataset.act === 'chk') mutate('PATCH', '/api/tasks/' + id, a.checked ? { status: 'done', progress: 100 } : { status: t.progress > 0 ? 'doing' : 'todo' });
+  if (a.dataset.act === 'chk') {
+    const p = mutate('PATCH', '/api/tasks/' + id, a.checked ? { status: 'done', progress: 100 } : { status: t.progress > 0 ? 'doing' : 'todo' });
+    if (a.checked) p.then(() => { openTask(id); askHandoff(); });
+  }
   else if (a.dataset.act === 'st') mutate('PATCH', '/api/tasks/' + id, a.value === 'done' ? { status: 'done', progress: 100 } : { status: a.value });
 });
 
@@ -738,7 +822,7 @@ async function poll() {
       render();
       const nowReady = S.tasks.filter((t) => t.assigneeId === ui.me && had.has(t.id) && isReady(t) && !wasReady.has(t.id));
       if (fresh.length) toast('Newly assigned to you: ' + fresh.map((t) => t.title).join(', '));
-      else if (nowReady.length) toast('Unblocked, ready to start: ' + nowReady.map((t) => keyOrTitle(t) + ' ' + t.title).join(', '));
+      else if (nowReady.length) toast('Unblocked, ready to start: ' + nowReady.map((t) => keyOrTitle(t) + ' ' + t.title).join(', ') + (nowReady.some((t) => upstreamWarnings(t).length) ? '  \u26A0 read the handoff warnings first' : ''));
     }
   } catch { setSync(false); }
 }
