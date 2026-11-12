@@ -75,6 +75,26 @@ const isDate = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && 
 const str = (v, max = 200) => String(v ?? '').trim().slice(0, max);
 const isColor = (c) => typeof c === 'string' && /^#[0-9a-fA-F]{6}$/.test(c);
 
+let skipDepCheck = false;
+// would giving `id` these deps make a loop? (walk from each dep through existing deps looking for id)
+function createsCycle(id, deps) {
+  const map = new Map(state.tasks.map((t) => [t.id, t.deps || []]));
+  const seen = new Set(), stack = [...deps];
+  while (stack.length) {
+    const cur = stack.pop();
+    if (cur === id) return true;
+    if (seen.has(cur)) continue; seen.add(cur);
+    for (const n of map.get(cur) || []) stack.push(n);
+  }
+  return false;
+}
+// sequential ids T001, T002... so tickets can reference each other
+function nextTaskId() {
+  let max = 0;
+  for (const t of state.tasks) { const m = /^t_t(\d+)$/i.exec(t.id); if (m) max = Math.max(max, +m[1]); }
+  return 't_t' + String(max + 1).padStart(3, '0');
+}
+
 function applyTask(task, input) {
   if ('title' in input) { task.title = str(input.title); if (!task.title) return 'Title is required'; }
   if ('groupId' in input) {
@@ -93,6 +113,16 @@ function applyTask(task, input) {
   if ('progress' in input) task.progress = Math.max(0, Math.min(100, Math.round(Number(input.progress) || 0)));
   if ('status' in input) { if (!STATUSES.includes(input.status)) return 'Bad status'; task.status = input.status; }
   if ('notes' in input) task.notes = str(input.notes, 2000);
+  if ('deps' in input) {
+    if (!Array.isArray(input.deps)) return 'deps must be a list';
+    const ids = [...new Set(input.deps.map((d) => String(d)))].filter((d) => d !== task.id);
+    if (ids.length > 50) return 'Too many dependencies';
+    if (!skipDepCheck) {
+      for (const d of ids) if (!state.tasks.some((x) => x.id === d)) return 'Unknown dependency ' + d;
+      if (createsCycle(task.id, ids)) return 'That dependency would create a loop';
+    }
+    task.deps = ids;
+  }
   return null;
 }
 
@@ -154,12 +184,14 @@ app.delete('/api/groups/:id', wrap(async (req, res) => {
   if (!state.groups.some((x) => x.id === req.params.id)) return res.status(404).json({ error: 'Not found' });
   state.groups = state.groups.filter((x) => x.id !== req.params.id);
   state.tasks = state.tasks.filter((t) => t.groupId !== req.params.id);
+  const left = new Set(state.tasks.map((t) => t.id));
+  for (const x of state.tasks) if (x.deps) x.deps = x.deps.filter((d) => left.has(d));
   await done(res);
 }));
 
 // tasks
 app.post('/api/tasks', wrap(async (req, res) => {
-  const t = { id: uid('t_'), groupId: null, title: '', assigneeId: null, start: '', end: '', progress: 0, status: 'todo', notes: '' };
+  const t = { id: nextTaskId(), groupId: null, title: '', assigneeId: null, start: '', end: '', progress: 0, status: 'todo', notes: '', deps: [] };
   const input = { ...req.body };
   if (!('end' in input) && isDate(input.start)) input.end = input.start;
   for (const k of ['groupId', 'title', 'start', 'end']) if (!(k in input)) return bad(res, k + ' is required');
@@ -180,6 +212,7 @@ app.patch('/api/tasks/:id', wrap(async (req, res) => {
 app.delete('/api/tasks/:id', wrap(async (req, res) => {
   if (!state.tasks.some((x) => x.id === req.params.id)) return res.status(404).json({ error: 'Not found' });
   state.tasks = state.tasks.filter((x) => x.id !== req.params.id);
+  for (const x of state.tasks) if (x.deps) x.deps = x.deps.filter((d) => d !== req.params.id);
   await done(res);
 }));
 
@@ -221,7 +254,7 @@ app.post('/api/bulk', wrap(async (req, res) => {
           if (!m) throw new Error(`Unknown assignee "${ti.assignee}" (task "${ti.title}")`);
           input.assigneeId = m.id;
         }
-        const t = { id: uid('t_'), groupId: g.id, title: '', assigneeId: null, start: '', end: '', progress: 0, status: 'todo', notes: '' };
+        const t = { id: nextTaskId(), groupId: g.id, title: '', assigneeId: null, start: '', end: '', progress: 0, status: 'todo', notes: '', deps: [] };
         const err = applyTask(t, input);
         if (err) throw new Error(`${err} (task "${ti.title}")`);
         state.tasks.push(t); added++;
@@ -246,11 +279,17 @@ app.put('/api/state', wrap(async (req, res) => {
     for (const m of b.members) next.members.push({ id: str(m.id, 20), name: str(m.name, 40) || 'Member', color: isColor(m.color) ? m.color : PALETTE[0] });
     for (const g of b.groups) next.groups.push({ id: str(g.id, 30), name: str(g.name, 80) || 'Group', color: isColor(g.color) ? g.color : PALETTE[0] });
     for (const x of b.tasks) {
-      const t = { id: str(x.id, 30) || uid('t_'), groupId: null, title: '', assigneeId: null, start: '', end: '', progress: 0, status: 'todo', notes: '' };
-      const err = applyTask(t, x);
+      const t = { id: str(x.id, 30) || uid('t_'), groupId: null, title: '', assigneeId: null, start: '', end: '', progress: 0, status: 'todo', notes: '', deps: [] };
+      skipDepCheck = true; const err = applyTask(t, x); skipDepCheck = false;
       if (err) throw new Error(err + ' (task "' + str(x.title) + '")');
       next.tasks.push(t);
     }
+    const ids = new Set(next.tasks.map((t) => t.id));
+    if (ids.size !== next.tasks.length) throw new Error('Duplicate task ids in backup');
+    for (const t of next.tasks) {
+      t.deps = (t.deps || []).filter((d) => ids.has(d));
+    }
+    for (const t of next.tasks) if (createsCycle(t.id, t.deps)) throw new Error('Dependency loop involving "' + t.title + '"');
     bump(); await persist();
     res.json(state);
   } catch (e) {

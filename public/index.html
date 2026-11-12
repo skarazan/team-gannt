@@ -48,7 +48,7 @@
   .tname { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer; padding-left:20px; }
   .tname:hover { text-decoration:underline; }
   .tname.done { color:var(--muted); text-decoration:line-through; }
-  .asg { width:112px; flex:none; border:2px solid #111; border-radius:6px; background:#fff; height:26px; font-size:12px; padding:0 2px; }
+  .asg { width:100px; flex:none; border:2px solid #111; border-radius:6px; background:#fff; height:26px; font-size:12px; padding:0 2px; }
   .bar { position:absolute; top:8px; height:22px; border:2px solid #111; border-radius:6px; cursor:grab; overflow:hidden; z-index:3; touch-action:none; user-select:none; }
   .bar:active { cursor:grabbing; }
   .bar .fill { position:absolute; inset:0 auto 0 0; background:rgba(0,0,0,.32); pointer-events:none; }
@@ -112,9 +112,9 @@
   #tTitle { flex:1; border:2px solid transparent; border-radius:8px; padding:4px 8px; font-family:inherit; font-size:20px; font-weight:700; line-height:1.3; resize:none; overflow:hidden; color:var(--ink); background:transparent; }
   #tTitle:hover { border-color:var(--line); } #tTitle:focus { border-color:#111; outline:none; background:#fff; }
   .td-close { flex:none; border:0; background:none; font-size:24px; line-height:1; cursor:pointer; padding:4px 6px; color:var(--muted); }
-  .td-body { display:grid; grid-template-columns:1fr 270px; min-height:0; flex:1; }
+  .td-body { display:grid; grid-template-columns:minmax(0,1fr) 300px; min-height:0; flex:1; }
   .td-main { padding:16px 20px; overflow:auto; border-right:2px solid #111; min-height:320px; }
-  .td-side { padding:16px; display:grid; gap:12px; align-content:start; background:#f6f7fc; overflow:auto; }
+  .td-side { padding:16px; display:grid; grid-template-columns:minmax(0,1fr); gap:12px; overflow-x:hidden; align-content:start; background:#f6f7fc; overflow:auto; }
   .td-tabs { display:flex; gap:6px; margin-bottom:12px; }
   .td-tabs button { border:2px solid #111; background:#fff; border-radius:999px; padding:3px 12px; font-weight:700; font-size:13px; cursor:pointer; }
   .td-tabs button.on { background:#111; color:#fff; }
@@ -134,8 +134,33 @@
   .td-count { font-size:11px; color:var(--muted); text-align:right; margin-top:4px; }
   .td-foot { display:flex; gap:8px; justify-content:flex-end; padding:12px 20px; border-top:2px solid #111; background:#fff; }
   .td-foot .left { margin-right:auto; }
+  .td-side > *, .td-side label.f > * { min-width:0; max-width:100%; }
+  .td-side select, .td-side input { width:100%; }
+  .td-side .prog input[type=number] { width:100%; }
   .td-meta { font-size:12px; color:var(--muted); }
   @media (max-width:760px) { .td-body { grid-template-columns:1fr; } .td-main { border-right:0; border-bottom:2px solid #111; } }
+  .st { flex:none; font-size:10px; font-weight:800; letter-spacing:.04em; border:2px solid #111; border-radius:999px; padding:1px 7px; cursor:default; white-space:nowrap; }
+  .st.ready { background:#2EBD6B; color:#fff; }
+  .st.wait { background:#fff; color:#111; border-style:dashed; }
+  .st.done { background:#e9ebf3; color:var(--muted); border-color:#b9bdd0; }
+  .bar.waiting { background-image:repeating-linear-gradient(45deg, rgba(255,255,255,.55) 0 6px, transparent 6px 12px) !important; border-style:dashed; }
+  .chip.ready-chip { border-color:#2EBD6B; } .chip.ready-chip.on { background:#2EBD6B; border-color:#111; }
+  .deps { display:grid; grid-template-columns:minmax(0,1fr); gap:6px; }
+  .dep { min-width:0; overflow:hidden; }
+  .dep { display:flex; align-items:center; gap:6px; border:2px solid #111; border-radius:8px; padding:4px 6px; background:#fff; font-size:12px; }
+  .dep .tref { flex:none; }
+  .dep .dt { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer; }
+  .dep .dt:hover { text-decoration:underline; }
+  .dep .sd { flex:none; width:10px; height:10px; border-radius:50%; border:2px solid #111; }
+  .dep .rm { flex:none; border:0; background:none; cursor:pointer; font-size:16px; line-height:1; color:var(--muted); padding:0 2px; }
+  .dep .rm:hover { color:#d11; }
+  .deps .none { font-size:12px; color:var(--muted); }
+  .dephead { font-size:12px; font-weight:700; color:var(--muted); display:flex; justify-content:space-between; align-items:center; }
+  #tDepAdd { border:2px solid #111; border-radius:8px; padding:4px 6px; font-size:12px; background:#fff; width:100%; }
+  .readyline { font-size:13px; font-weight:700; padding:8px 10px; border:2px solid #111; border-radius:10px; }
+  .readyline.ready { background:#e6f8ee; } .readyline.wait { background:#fff7e0; } .readyline.done { background:#eef0f6; color:var(--muted); }
+  .ticket .tref, .dep .tref { font:700 12px ui-monospace, Menlo, monospace; background:#eef0ff; border:1.5px solid #5271FF; color:#2b3fb8; border-radius:5px; padding:0 5px; cursor:pointer; }
+  .mt .wt { grid-column:2; font-size:12px; color:#8a5a00; }
   #toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:#111; color:#fff; padding:9px 16px; border-radius:8px; font-weight:600; display:none; z-index:50; max-width:90vw; }
 </style>
 </head>
@@ -145,7 +170,7 @@
   <div class="chips" id="chips"></div>
   <div class="spacer"></div>
   <button class="btn" id="meBtn" title="Switch user"></button>
-  <button class="btn" id="mineBtn">My tasks<span class="badge" id="mineCount"></span></button>
+  <button class="btn" id="mineBtn" title="Badge = your tasks ready to start">My tasks<span class="badge" id="mineCount"></span></button>
   <select id="zoom" class="btn" title="Zoom">
     <option value="26">Days</option>
     <option value="12">Weeks</option>
@@ -193,6 +218,10 @@
         <label class="f">End<input type="date" id="tEnd" required></label>
         <label class="f">Group (workflow)<select id="tGroup"></select></label>
         <div class="td-meta" id="tMeta"></div>
+        <div class="readyline" id="tReady"></div>
+        <div><div class="dephead">Depends on (must be done first)</div><div class="deps" id="tDeps"></div>
+          <select id="tDepAdd" style="margin-top:6px"></select></div>
+        <div><div class="dephead">Unblocks (waiting on this)</div><div class="deps" id="tUnblocks"></div></div>
       </div>
     </div>
     <div class="td-foot">
@@ -246,6 +275,7 @@ const ui = {
 };
 ui.me = localStorage.getItem('gantt.me');
 ui.mineOpen = localStorage.getItem('gantt.mine') === '1';
+ui.readyOnly = false;
 let drag = null;
 
 // ---------------------------------------------------------------- api
@@ -267,18 +297,27 @@ function setSync(ok) { $('#sync').textContent = ok ? 'synced' : 'offline - retry
 // ---------------------------------------------------------------- helpers
 const member = (id) => S.members.find((m) => m.id === id);
 const me = () => member(ui.me);
+const taskById = (id) => S.tasks.find((t) => t.id === id);
+const depsOf = (t) => (t.deps || []).map(taskById).filter(Boolean);
+const blockersOf = (t) => depsOf(t).filter((d) => d.status !== 'done');
+const isReady = (t) => t.status !== 'done' && !blockersOf(t).length;
+const unblocksOf = (t) => S.tasks.filter((x) => (x.deps || []).includes(t.id));
+const SDOT = { todo: '#ffffff', doing: '#F2B705', done: '#2EBD6B', blocked: '#FF5757' };
+const keyOrTitle = (t) => taskKey(t) || t.title.slice(0, 20);
 const openCount = (id) => S.tasks.filter((t) => t.status !== 'done' && t.assigneeId === id).length;
 const colorOf = (t) => (member(t.assigneeId) || {}).color || GREY;
 function visibleTasks(gid) {
-  return S.tasks.filter((t) => t.groupId === gid && (ui.filter === null || (ui.filter === 'none' ? !t.assigneeId : t.assigneeId === ui.filter)));
+  return S.tasks.filter((t) => t.groupId === gid && (!ui.readyOnly || isReady(t)) && (ui.filter === null || (ui.filter === 'none' ? !t.assigneeId : t.assigneeId === ui.filter)));
 }
 
 // ---------------------------------------------------------------- render
 function renderChips() {
   const open = (id) => S.tasks.filter((t) => t.status !== 'done' && (id === 'none' ? !t.assigneeId : t.assigneeId === id)).length;
-  let h = `<span class="chip ${ui.filter === null ? 'on' : ''}" data-f="all">All</span>`;
+  let h = `<span class="chip ${ui.filter === null && !ui.readyOnly ? 'on' : ''}" data-f="all">All</span>`;
   for (const m of S.members) h += `<span class="chip ${ui.filter === m.id ? 'on' : ''}" data-f="${m.id}"><i style="background:${m.color}"></i>${esc(m.name)}${m.id === ui.me ? ' (you)' : ''} <small>${open(m.id)}</small></span>`;
   h += `<span class="chip ${ui.filter === 'none' ? 'on' : ''}" data-f="none"><i style="background:${GREY}"></i>Unassigned <small>${open('none')}</small></span>`;
+  const nReady = S.tasks.filter(isReady).length;
+  h = `<span class="chip ready-chip ${ui.readyOnly ? 'on' : ''}" data-f="ready" title="Tasks whose dependencies are all done">&#9654; Ready now <small>${nReady}</small></span>` + h;
   $('#chips').innerHTML = h;
 }
 
@@ -319,7 +358,7 @@ function render() {
   let shown = 0;
   for (const g of S.groups) {
     const all = S.tasks.filter((t) => t.groupId === g.id), vis = visibleTasks(g.id);
-    if (ui.filter !== null && !vis.length) continue;
+    if ((ui.filter !== null || ui.readyOnly) && !vis.length) continue;
     shown++;
     const closed = ui.collapsed.has(g.id);
     const doneN = all.filter((t) => t.status === 'done').length;
@@ -344,9 +383,10 @@ function render() {
       const label = (t.status === 'done' ? '&#10003; ' : '') + esc(t.title);
       h += `<div class="row"><div class="lcell">
           <span class="tname ${t.status === 'done' ? 'done' : ''}" data-act="editTask" data-id="${t.id}" title="${esc(t.title)}">${t.assigneeId && t.assigneeId === ui.me ? '<span class="star">&#9733;</span>' : ''}${taskKey(t) ? '<span class="rk">' + taskKey(t) + '</span>' : ''}${esc(t.title)}</span>
+          ${stBadge(t)}
           <select class="asg" data-id="${t.id}" title="Delegate">${opts}</select>
         </div><div class="tcell" style="width:${W}px;background-image:${grid}">
-          <div class="bar ${t.status}${t.assigneeId && t.assigneeId === ui.me ? ' mine' : ''}" data-tid="${t.id}" style="left:${left}px;width:${w}px;background:${colorOf(t)}" title="${esc(t.title)} (${fmt(s)} - ${fmt(e)}, ${t.progress}%)">
+          <div class="bar ${t.status}${t.status !== 'done' && blockersOf(t).length ? ' waiting' : ''}${t.assigneeId && t.assigneeId === ui.me ? ' mine' : ''}" data-tid="${t.id}" style="left:${left}px;width:${w}px;background:${colorOf(t)}" title="${esc(t.title)} (${fmt(s)} - ${fmt(e)}, ${t.progress}%)${blockersOf(t).length && t.status !== 'done' ? '\nWaiting on ' + esc(blockersOf(t).map(keyOrTitle).join(', ')) : ''}">
             <div class="fill" style="width:${t.progress}%"></div><div class="lbl">${w > 70 ? label : ''}</div><div class="hl"></div><div class="hr"></div>
           </div></div></div>`;
     }
@@ -354,6 +394,12 @@ function render() {
   if (!shown) h += `<div class="empty">${S.groups.length ? 'No tasks match this filter.' : 'No groups yet. Click "+ Group" to create your first workflow.'}</div>`;
   h += `<div id="today" style="left:${LEFTW + (today - mn) * dw + dw / 2}px"></div>`;
   $('#chart').innerHTML = h;
+}
+function stBadge(t) {
+  if (t.status === 'done') return '<span class="st done">DONE</span>';
+  const b = blockersOf(t);
+  if (!b.length) return '<span class="st ready" title="All dependencies done: you can start this">READY</span>';
+  return `<span class="st wait" title="Waiting on: ${esc(b.map((d) => keyOrTitle(d) + ' ' + d.title + ' (' + ((member(d.assigneeId) || {}).name || 'unassigned') + ')').join('\n'))}">WAITS ${b.length}</span>`;
 }
 function mSpan(c, dw) { return `<span style="left:${c.i * dw}px;width:${c.n * dw}px">${c.n * dw > 60 ? c.label : ''}</span>`; }
 
@@ -374,7 +420,11 @@ chart.addEventListener('change', (e) => {
 });
 $('#chips').addEventListener('click', (e) => {
   const c = e.target.closest('.chip'); if (!c) return;
-  const f = c.dataset.f; ui.filter = f === 'all' || ui.filter === f ? null : f; render();
+  const f = c.dataset.f;
+  if (f === 'ready') ui.readyOnly = !ui.readyOnly;
+  else if (f === 'all') { ui.filter = null; ui.readyOnly = false; }
+  else ui.filter = ui.filter === f ? null : f;
+  render();
 });
 
 chart.addEventListener('pointerdown', (e) => {
@@ -428,7 +478,7 @@ $('#importFile').addEventListener('change', async (e) => {
 });
 
 // ---------------------------------------------------------------- task dialog
-let editing = null;
+let editing = null, editDeps = [];
 function openTask(id, gid) {
   const t = id ? S.tasks.find((x) => x.id === id) : null; editing = t;
   if (!t && !S.groups.length) return toast('Create a group first');
@@ -444,6 +494,8 @@ function openTask(id, gid) {
   $('#tProg').value = $('#tProgN').value = t ? t.progress : 0;
   $('#tNotes').value = t ? t.notes : '';
   $('#tKey').textContent = t ? taskKey(t) : '';
+  editDeps = t ? [...(t.deps || [])] : [];
+  renderDeps();
   $('#tDelete').style.display = t ? '' : 'none';
   setNotesMode(t && t.notes ? 'view' : 'edit');
   updateMeta();
@@ -453,6 +505,37 @@ function openTask(id, gid) {
 }
 const taskKey = (t) => { const m = /^t_(t\d{3,})$/i.exec(t.id); return m ? m[1].toUpperCase() : ''; };
 const byKey = (k) => S.tasks.find((t) => taskKey(t) === k.toUpperCase());
+function depRow(d, removable) {
+  return `<div class="dep"><span class="sd" style="background:${SDOT[d.status]}" title="${d.status}"></span>${taskKey(d) ? `<a class="tref" data-open="${d.id}">${taskKey(d)}</a>` : ''}<span class="dt" data-open="${d.id}" title="${esc(d.title)}">${esc(d.title)}</span>${removable ? `<button type="button" class="rm" data-rm="${d.id}" title="Remove dependency">&times;</button>` : ''}</div>`;
+}
+function wouldLoop(id, depId) {
+  if (!id) return false;
+  const seen = new Set(), stack = [depId];
+  while (stack.length) { const c = stack.pop(); if (c === id) return true; if (seen.has(c)) continue; seen.add(c); const t = taskById(c); if (t) stack.push(...(t.deps || [])); }
+  return false;
+}
+function renderDeps() {
+  const self = editing;
+  const ds = editDeps.map(taskById).filter(Boolean);
+  $('#tDeps').innerHTML = ds.length ? ds.map((d) => depRow(d, true)).join('') : '<div class="none">None, can start any time.</div>';
+  const ub = self ? unblocksOf(self) : [];
+  $('#tUnblocks').innerHTML = ub.length ? ub.map((d) => depRow(d, false)).join('') : '<div class="none">Nothing.</div>';
+  const blockers = ds.filter((d) => d.status !== 'done');
+  const st = $('#tStatus').value, rl = $('#tReady');
+  if (st === 'done') { rl.className = 'readyline done'; rl.textContent = 'Done'; }
+  else if (!blockers.length) { rl.className = 'readyline ready'; rl.textContent = '▶ Ready: you can start this now'; }
+  else { rl.className = 'readyline wait'; rl.textContent = '⏳ Waiting on ' + blockers.length + ': ' + blockers.map((d) => keyOrTitle(d) + ' (' + ((member(d.assigneeId) || {}).name || 'unassigned') + ')').join(', '); }
+  const opts = S.tasks.filter((x) => (!self || x.id !== self.id) && !editDeps.includes(x.id) && !wouldLoop(self && self.id, x.id))
+    .sort((a, b) => a.start.localeCompare(b.start));
+  $('#tDepAdd').innerHTML = '<option value="">+ Add a dependency…</option>' + opts.map((x) => `<option value="${x.id}">${taskKey(x) ? taskKey(x) + ' · ' : ''}${esc(x.title.slice(0, 70))}</option>`).join('');
+  if (!$('#tView').hidden) $('#tView').innerHTML = renderTicket($('#tNotes').value);
+}
+$('#tDepAdd').addEventListener('change', (e) => { if (e.target.value) { editDeps.push(e.target.value); renderDeps(); } });
+$('#taskDlg').addEventListener('click', (e) => {
+  const rm = e.target.closest('[data-rm]'); if (rm) { editDeps = editDeps.filter((x) => x !== rm.dataset.rm); renderDeps(); return; }
+  const op = e.target.closest('[data-open]'); if (op) openTask(op.dataset.open);
+});
+$('#tStatus').addEventListener('change', renderDeps);
 function fitTitle() { const el = $('#tTitle'); el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
 $('#tTitle').addEventListener('input', fitTitle);
 $('#tTitle').addEventListener('keydown', (e) => { if (e.key === 'Enter') e.preventDefault(); });
@@ -485,7 +568,13 @@ function renderTicket(text) {
     if (m) { cur = { label: m[1].toUpperCase(), lines: [] }; secs.push(cur); if (m[2].trim()) cur.lines.push(m[2]); }
     else { if (!cur) { cur = { label: null, lines: [] }; secs.push(cur); } cur.lines.push(raw); }
   }
+  const depSecIdx = secs.findIndex((x) => x.label === 'DEPENDS ON');
+  const depHtml = (() => { const ds = editDeps.map(taskById).filter(Boolean);
+    return `<div class="sec"><span class="lab dep">Depends on</span>${ds.length ? '<ul>' + ds.map((d) => `<li><a class="tref" data-open="${d.id}">${esc(keyOrTitle(d))}</a> ${esc(d.title)} <b style="color:${d.status === 'done' ? '#1d8a4c' : '#8a5a00'}">(${d.status === 'done' ? 'done' : (member(d.assigneeId) || {}).name || 'unassigned'})</b></li>`).join('') + '</ul>' : '<p class="empty">None, can start any time.</p>'}</div>`; })();
+  if (depSecIdx >= 0) secs[depSecIdx] = { html: depHtml };
+  else { const ni = secs.findIndex((x) => x.label === 'NOTES'); secs.splice(ni >= 0 ? ni : secs.length, 0, { html: depHtml }); }
   return secs.map((sec) => {
+    if (sec.html) return sec.html;
     let h = '', list = null;
     const close = () => { if (list) { h += `</${list.tag}>`; list = null; } };
     for (const line of sec.lines) {
@@ -516,7 +605,7 @@ $('#tSave').onclick = async () => {
   const body = {
     title: $('#tTitle').value, groupId: $('#tGroup').value, assigneeId: $('#tAsg').value || null,
     start: $('#tStart').value, end: $('#tEnd').value, status: $('#tStatus').value,
-    progress: +$('#tProgN').value || 0, notes: $('#tNotes').value,
+    progress: +$('#tProgN').value || 0, notes: $('#tNotes').value, deps: editDeps,
   };
   $('#taskDlg').close();
   await (editing ? mutate('PATCH', '/api/tasks/' + editing.id, body) : mutate('POST', '/api/tasks', body));
@@ -568,7 +657,7 @@ $('#mSave').onclick = async () => {
 function renderMe() {
   const m = me();
   $('#meBtn').innerHTML = m ? `<span class="dot" style="background:${m.color};display:inline-block;vertical-align:-2px;margin-right:6px"></span>${esc(m.name)} (you)` : 'Who are you?';
-  const n = m ? openCount(m.id) : 0;
+  const n = m ? S.tasks.filter((t) => t.assigneeId === m.id && isReady(t)).length : 0;
   $('#mineCount').textContent = n ? n : '';
   $('#mineBtn').classList.toggle('primary', ui.mineOpen);
 }
@@ -596,7 +685,8 @@ function dueLabel(t, td) {
 function mineCard(t, td, od) {
   const g = S.groups.find((x) => x.id === t.groupId) || { name: '', color: GREY };
   return `<div class="mt ${od ? 'od' : ''}"><input type="checkbox" data-act="chk" data-id="${t.id}" ${t.status === 'done' ? 'checked' : ''} title="Mark done">
-    <div class="tt" data-act="open" data-id="${t.id}">${esc(t.title)}</div>
+    <div class="tt" data-act="open" data-id="${t.id}">${taskKey(t) ? '<span class="rk">' + taskKey(t) + '</span>' : ''}${esc(t.title)}</div>
+    ${t.status !== 'done' && blockersOf(t).length ? '<div class="wt">Waiting on ' + blockersOf(t).map((d) => `<a class="tref" data-act="open" data-id="${d.id}">${esc(keyOrTitle(d))}</a> (${esc((member(d.assigneeId) || {}).name || 'unassigned')})`).join(', ') + '</div>' : ''}
     <div class="ln"><span><i class="gd" style="background:${esc(g.color)}"></i>${esc(g.name)}</span><span>${fmt(toDay(t.start))} - ${fmt(toDay(t.end))}</span>${t.status === 'done' ? '' : '<span>' + dueLabel(t, td) + '</span>'}</div>
     <div class="ln"><select data-act="st" data-id="${t.id}">${[['todo','To do'],['doing','In progress'],['done','Done'],['blocked','Blocked']].map(([v,l]) => `<option value="${v}" ${t.status === v ? 'selected' : ''}>${l}</option>`).join('')}</select><span>${t.progress}%</span></div></div>`;
 }
@@ -606,14 +696,15 @@ function renderMine() {
   const td = todayDay();
   const mine = S.tasks.filter((t) => t.assigneeId === m.id);
   const open = mine.filter((t) => t.status !== 'done').sort((a, b) => a.end.localeCompare(b.end) || a.start.localeCompare(b.start));
-  const over = open.filter((t) => toDay(t.end) < td), rest = open.filter((t) => toDay(t.end) >= td);
+  const ready = open.filter(isReady), waiting = open.filter((t) => !isReady(t));
+  const over = open.filter((t) => toDay(t.end) < td);
   const done = mine.filter((t) => t.status === 'done');
-  const free = S.tasks.filter((t) => !t.assigneeId && t.status !== 'done');
+  const free = S.tasks.filter((t) => !t.assigneeId && t.status !== 'done').sort((a, b) => isReady(b) - isReady(a));
   let h = `<h3><span class="dot" style="background:${m.color}"></span>${esc(m.name)}'s tasks</h3>
-    <div class="sub">${open.length} open${over.length ? ' &middot; <b style="color:#d11">' + over.length + ' overdue</b>' : ''} &middot; ${done.length} done</div>`;
+    <div class="sub"><b style="color:#1d8a4c">${ready.length} ready to start</b> &middot; ${waiting.length} waiting &middot; ${done.length} done${over.length ? ' &middot; <b style="color:#d11">' + over.length + ' overdue</b>' : ''}</div>`;
   if (!mine.length) h += '<p style="color:var(--muted)">Nothing is delegated to you yet. Someone can assign you a task from its dropdown, or take an unassigned one below.</p>';
-  if (over.length) h += '<h4 class="od">Overdue</h4>' + over.map((t) => mineCard(t, td, true)).join('');
-  if (rest.length) h += '<h4>Open</h4>' + rest.map((t) => mineCard(t, td, false)).join('');
+  if (ready.length) h += '<h4 style="color:#1d8a4c">Ready to start now</h4>' + ready.map((t) => mineCard(t, td, toDay(t.end) < td)).join('');
+  if (waiting.length) h += '<h4>Waiting on others</h4>' + waiting.map((t) => mineCard(t, td, toDay(t.end) < td)).join('');
   if (done.length) h += '<h4>Done</h4>' + done.map((t) => mineCard(t, td, false)).join('');
   if (free.length) {
     h += `<h4>Unassigned (${free.length})</h4>` + free.map((t) => `<div class="mt free"><span></span><div class="tt" data-act="open" data-id="${t.id}">${esc(t.title)}</div>
@@ -641,10 +732,13 @@ async function poll() {
     setSync(true);
     if (!r.unchanged) {
       const had = new Set(S.tasks.filter((t) => t.assigneeId === ui.me).map((t) => t.id));
+      const wasReady = new Set(S.tasks.filter((t) => t.assigneeId === ui.me && isReady(t)).map((t) => t.id));
       S = r;
       const fresh = S.tasks.filter((t) => ui.me && t.assigneeId === ui.me && !had.has(t.id));
       render();
+      const nowReady = S.tasks.filter((t) => t.assigneeId === ui.me && had.has(t.id) && isReady(t) && !wasReady.has(t.id));
       if (fresh.length) toast('Newly assigned to you: ' + fresh.map((t) => t.title).join(', '));
+      else if (nowReady.length) toast('Unblocked, ready to start: ' + nowReady.map((t) => keyOrTitle(t) + ' ' + t.title).join(', '));
     }
   } catch { setSync(false); }
 }
