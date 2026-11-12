@@ -101,7 +101,41 @@
   .who i { width:16px; height:16px; border-radius:50%; border:2px solid #111; flex:none; }
   .who small { margin-left:auto; color:var(--muted); font-weight:500; font-size:12px; }
   .bar.mine { box-shadow:0 0 0 3px #FFD43B, 0 0 0 5px #111; z-index:4; }
+  .rk { font:700 10px ui-monospace, Menlo, monospace; color:var(--muted); margin-right:6px; }
   .tname .star { color:#e0a800; margin-right:3px; }
+  /* task dialog: two-column ticket view */
+  dialog#taskDlg { width:min(1000px, 96vw); max-height:92vh; }
+  #taskDlg form { padding:0; display:flex; flex-direction:column; max-height:92vh; gap:0; }
+  .td-head { display:flex; align-items:flex-start; gap:10px; padding:16px 20px 12px; border-bottom:2px solid #111; }
+  .td-key { flex:none; font:700 12px/1 ui-monospace, Menlo, monospace; background:#111; color:#fff; border-radius:6px; padding:6px 8px; margin-top:5px; }
+  .td-key:empty { display:none; }
+  #tTitle { flex:1; border:2px solid transparent; border-radius:8px; padding:4px 8px; font-family:inherit; font-size:20px; font-weight:700; line-height:1.3; resize:none; overflow:hidden; color:var(--ink); background:transparent; }
+  #tTitle:hover { border-color:var(--line); } #tTitle:focus { border-color:#111; outline:none; background:#fff; }
+  .td-close { flex:none; border:0; background:none; font-size:24px; line-height:1; cursor:pointer; padding:4px 6px; color:var(--muted); }
+  .td-body { display:grid; grid-template-columns:1fr 270px; min-height:0; flex:1; }
+  .td-main { padding:16px 20px; overflow:auto; border-right:2px solid #111; min-height:320px; }
+  .td-side { padding:16px; display:grid; gap:12px; align-content:start; background:#f6f7fc; overflow:auto; }
+  .td-tabs { display:flex; gap:6px; margin-bottom:12px; }
+  .td-tabs button { border:2px solid #111; background:#fff; border-radius:999px; padding:3px 12px; font-weight:700; font-size:13px; cursor:pointer; }
+  .td-tabs button.on { background:#111; color:#fff; }
+  .ticket { font-size:15px; line-height:1.55; color:var(--ink); }
+  .ticket .sec { margin:0 0 16px; }
+  .ticket .lab { display:inline-block; font-size:11px; font-weight:800; letter-spacing:.07em; text-transform:uppercase; padding:3px 9px; border-radius:999px; border:2px solid #111; margin-bottom:6px; }
+  .ticket .lab.goal { background:#5271FF; color:#fff; } .ticket .lab.steps { background:#FF7A1F; color:#fff; }
+  .ticket .lab.done { background:#2EBD6B; color:#fff; } .ticket .lab.dep { background:#5CE1E6; } .ticket .lab.notes { background:#F2B705; }
+  .ticket p { margin:2px 0 6px; }
+  .ticket ol, .ticket ul { margin:2px 0 6px; padding-left:24px; }
+  .ticket li { margin:3px 0; }
+  .ticket ul.check { list-style:none; padding-left:4px; } .ticket ul.check li::before { content:'\2610  '; font-weight:700; }
+  .ticket .tref { font:700 12px ui-monospace, Menlo, monospace; background:#eef0ff; border:1.5px solid #5271FF; color:#2b3fb8; border-radius:5px; padding:0 5px; cursor:pointer; text-decoration:none; }
+  .ticket .tref:hover { background:#5271FF; color:#fff; }
+  .ticket .empty { color:var(--muted); font-style:italic; }
+  #tNotes { width:100%; min-height:360px; border:2px solid #111; border-radius:10px; padding:10px 12px; font:14px/1.5 ui-monospace, Menlo, Consolas, monospace; resize:vertical; }
+  .td-count { font-size:11px; color:var(--muted); text-align:right; margin-top:4px; }
+  .td-foot { display:flex; gap:8px; justify-content:flex-end; padding:12px 20px; border-top:2px solid #111; background:#fff; }
+  .td-foot .left { margin-right:auto; }
+  .td-meta { font-size:12px; color:var(--muted); }
+  @media (max-width:760px) { .td-body { grid-template-columns:1fr; } .td-main { border-right:0; border-bottom:2px solid #111; } }
   #toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:#111; color:#fff; padding:9px 16px; border-radius:8px; font-weight:600; display:none; z-index:50; max-width:90vw; }
 </style>
 </head>
@@ -138,24 +172,30 @@
 
 <dialog id="taskDlg">
   <form id="taskForm" onsubmit="return false">
-    <h2 id="taskDlgTitle">Task</h2>
-    <label class="f">Title<input id="tTitle" required maxlength="200"></label>
-    <div class="two">
-      <label class="f">Group (workflow)<select id="tGroup"></select></label>
-      <label class="f">Assigned to<select id="tAsg"></select></label>
+    <div class="td-head">
+      <span class="td-key" id="tKey"></span>
+      <textarea id="tTitle" rows="1" required maxlength="200" placeholder="Task title"></textarea>
+      <button type="button" class="td-close" id="tX" title="Close">&times;</button>
     </div>
-    <div class="two">
-      <label class="f">Start<input type="date" id="tStart" required></label>
-      <label class="f">End<input type="date" id="tEnd" required></label>
+    <div class="td-body">
+      <div class="td-main">
+        <div class="td-tabs"><button type="button" id="tViewBtn" class="on">Ticket</button><button type="button" id="tEditBtn">Edit notes</button></div>
+        <div class="ticket" id="tView"></div>
+        <div id="tEditWrap" hidden><textarea id="tNotes" maxlength="2000" placeholder="GOAL: ...&#10;STEPS:&#10;1. ...&#10;DONE WHEN:&#10;- ...&#10;DEPENDS ON: ...&#10;NOTES: ..."></textarea><div class="td-count" id="tCount"></div></div>
+      </div>
+      <div class="td-side">
+        <label class="f">Assigned to<select id="tAsg"></select></label>
+        <label class="f">Status<select id="tStatus">
+          <option value="todo">To do</option><option value="doing">In progress</option>
+          <option value="done">Done</option><option value="blocked">Blocked</option></select></label>
+        <label class="f">Progress (%)<div class="prog"><input type="range" id="tProg" min="0" max="100" step="5"><input type="number" id="tProgN" min="0" max="100"></div></label>
+        <label class="f">Start<input type="date" id="tStart" required></label>
+        <label class="f">End<input type="date" id="tEnd" required></label>
+        <label class="f">Group (workflow)<select id="tGroup"></select></label>
+        <div class="td-meta" id="tMeta"></div>
+      </div>
     </div>
-    <div class="two">
-      <label class="f">Status<select id="tStatus">
-        <option value="todo">To do</option><option value="doing">In progress</option>
-        <option value="done">Done</option><option value="blocked">Blocked</option></select></label>
-      <label class="f">Progress (%)<div class="prog"><input type="range" id="tProg" min="0" max="100" step="5"><input type="number" id="tProgN" min="0" max="100"></div></label>
-    </div>
-    <label class="f">Notes<textarea id="tNotes" rows="3" maxlength="2000"></textarea></label>
-    <div class="actions">
+    <div class="td-foot">
       <button type="button" class="btn danger left" id="tDelete">Delete</button>
       <button type="button" class="btn" id="tCancel">Cancel</button>
       <button type="button" class="btn primary" id="tSave">Save</button>
@@ -303,7 +343,7 @@ function render() {
       const opts = `<option value="">Unassigned</option>` + S.members.map((m) => `<option value="${m.id}" ${m.id === t.assigneeId ? 'selected' : ''}>${esc(m.name)}</option>`).join('');
       const label = (t.status === 'done' ? '&#10003; ' : '') + esc(t.title);
       h += `<div class="row"><div class="lcell">
-          <span class="tname ${t.status === 'done' ? 'done' : ''}" data-act="editTask" data-id="${t.id}" title="${esc(t.title)}">${t.assigneeId && t.assigneeId === ui.me ? '<span class="star">&#9733;</span>' : ''}${esc(t.title)}</span>
+          <span class="tname ${t.status === 'done' ? 'done' : ''}" data-act="editTask" data-id="${t.id}" title="${esc(t.title)}">${t.assigneeId && t.assigneeId === ui.me ? '<span class="star">&#9733;</span>' : ''}${taskKey(t) ? '<span class="rk">' + taskKey(t) + '</span>' : ''}${esc(t.title)}</span>
           <select class="asg" data-id="${t.id}" title="Delegate">${opts}</select>
         </div><div class="tcell" style="width:${W}px;background-image:${grid}">
           <div class="bar ${t.status}${t.assigneeId && t.assigneeId === ui.me ? ' mine' : ''}" data-tid="${t.id}" style="left:${left}px;width:${w}px;background:${colorOf(t)}" title="${esc(t.title)} (${fmt(s)} - ${fmt(e)}, ${t.progress}%)">
@@ -392,7 +432,6 @@ let editing = null;
 function openTask(id, gid) {
   const t = id ? S.tasks.find((x) => x.id === id) : null; editing = t;
   if (!t && !S.groups.length) return toast('Create a group first');
-  $('#taskDlgTitle').textContent = t ? 'Edit task' : 'New task';
   $('#tGroup').innerHTML = S.groups.map((g) => `<option value="${g.id}">${esc(g.name)}</option>`).join('');
   $('#tAsg').innerHTML = `<option value="">Unassigned</option>` + S.members.map((m) => `<option value="${m.id}">${esc(m.name)}</option>`).join('');
   const td = todayDay();
@@ -404,9 +443,69 @@ function openTask(id, gid) {
   $('#tStatus').value = t ? t.status : 'todo';
   $('#tProg').value = $('#tProgN').value = t ? t.progress : 0;
   $('#tNotes').value = t ? t.notes : '';
+  $('#tKey').textContent = t ? taskKey(t) : '';
   $('#tDelete').style.display = t ? '' : 'none';
-  $('#taskDlg').showModal(); $('#tTitle').focus();
+  setNotesMode(t && t.notes ? 'view' : 'edit');
+  updateMeta();
+  $('#taskDlg').showModal(); fitTitle();
+  if (!t) $('#tTitle').focus(); else $('#tTitle').blur();
+  $('#taskDlg .td-main').scrollTop = 0;
 }
+const taskKey = (t) => { const m = /^t_(t\d{3,})$/i.exec(t.id); return m ? m[1].toUpperCase() : ''; };
+const byKey = (k) => S.tasks.find((t) => taskKey(t) === k.toUpperCase());
+function fitTitle() { const el = $('#tTitle'); el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
+$('#tTitle').addEventListener('input', fitTitle);
+$('#tTitle').addEventListener('keydown', (e) => { if (e.key === 'Enter') e.preventDefault(); });
+function updateMeta() {
+  const s = $('#tStart').value, e = $('#tEnd').value;
+  const days = s && e ? toDay(e) - toDay(s) + 1 : 0;
+  $('#tMeta').textContent = days > 0 ? `${days} day${days > 1 ? 's' : ''} \u00b7 ${fmt(toDay(s))} \u2013 ${fmt(toDay(e))}` : '';
+  $('#tCount').textContent = $('#tNotes').value.length + ' / 2000';
+}
+['tStart', 'tEnd'].forEach((id) => $('#' + id).addEventListener('change', updateMeta));
+$('#tNotes').addEventListener('input', updateMeta);
+function setNotesMode(mode) {
+  const edit = mode === 'edit';
+  $('#tViewBtn').classList.toggle('on', !edit); $('#tEditBtn').classList.toggle('on', edit);
+  $('#tView').hidden = edit; $('#tEditWrap').hidden = !edit;
+  if (!edit) $('#tView').innerHTML = renderTicket($('#tNotes').value);
+}
+$('#tViewBtn').onclick = () => setNotesMode('view');
+$('#tEditBtn').onclick = () => { setNotesMode('edit'); $('#tNotes').focus(); };
+$('#tX').onclick = () => $('#taskDlg').close();
+const LABELS = { 'GOAL': 'goal', 'STEPS': 'steps', 'DONE WHEN': 'done', 'DEPENDS ON': 'dep', 'NOTES': 'notes' };
+function linkify(html) {
+  return html.replace(/\b(T\d{3,})\b/g, (m) => byKey(m) ? `<a class="tref" data-key="${m}" title="${esc(byKey(m).title)}">${m}</a>` : m);
+}
+function renderTicket(text) {
+  if (!text.trim()) return '<p class="empty">No notes yet. Click "Edit notes" to add the ticket.</p>';
+  const secs = []; let cur = null;
+  for (const raw of text.split(/\r?\n/)) {
+    const m = /^\s*(GOAL|STEPS|DONE WHEN|DEPENDS ON|NOTES)\s*:\s*(.*)$/i.exec(raw);
+    if (m) { cur = { label: m[1].toUpperCase(), lines: [] }; secs.push(cur); if (m[2].trim()) cur.lines.push(m[2]); }
+    else { if (!cur) { cur = { label: null, lines: [] }; secs.push(cur); } cur.lines.push(raw); }
+  }
+  return secs.map((sec) => {
+    let h = '', list = null;
+    const close = () => { if (list) { h += `</${list.tag}>`; list = null; } };
+    for (const line of sec.lines) {
+      const l = line.trim(); if (!l) { close(); continue; }
+      const num = /^\d+[.)]\s+(.*)$/.exec(l), bul = /^[-*\u2022]\s+(.*)$/.exec(l);
+      if (num || bul) {
+        const tag = num ? 'ol' : 'ul', cls = bul && sec.label === 'DONE WHEN' ? ' class="check"' : '';
+        if (!list || list.tag !== tag) { close(); h += `<${tag}${cls}>`; list = { tag }; }
+        h += `<li>${linkify(esc((num || bul)[1]))}</li>`;
+      } else { close(); h += `<p>${linkify(esc(l))}</p>`; }
+    }
+    close();
+    const lab = sec.label ? `<span class="lab ${LABELS[sec.label]}">${sec.label === 'DONE WHEN' ? 'Done when' : sec.label === 'DEPENDS ON' ? 'Depends on' : sec.label[0] + sec.label.slice(1).toLowerCase()}</span>` : '';
+    return `<div class="sec">${lab}${h}</div>`;
+  }).join('');
+}
+$('#tView').addEventListener('click', (e) => {
+  const a = e.target.closest('.tref'); if (!a) return;
+  const t = byKey(a.dataset.key); if (t) openTask(t.id);
+});
 $('#tStart').addEventListener('change', () => { if ($('#tEnd').value < $('#tStart').value) $('#tEnd').value = $('#tStart').value; });
 $('#tProg').addEventListener('input', () => ($('#tProgN').value = $('#tProg').value));
 $('#tProgN').addEventListener('input', () => ($('#tProg').value = $('#tProgN').value));
