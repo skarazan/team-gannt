@@ -136,12 +136,27 @@ app.get('/healthz', (req, res) => res.send('ok'));
 
 if (PASSWORD) {
   const want = crypto.createHash('sha256').update(PASSWORD).digest();
+  // After one successful password prompt the browser gets a 90-day sign-in cookie.
+  // It is derived from the password, so changing TEAM_PASSWORD signs everyone out.
+  const sessionToken = crypto.createHmac('sha256', PASSWORD).update('team-gantt-session-v1').digest('hex');
+  const COOKIE = 'tg_session';
+  const hasSession = (req) => (req.headers.cookie || '').split(';').some((c) => {
+    const [k, ...v] = c.trim().split('=');
+    if (k !== COOKIE) return false;
+    const a = Buffer.from(v.join('=')), b = Buffer.from(sessionToken);
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
+  });
+  app.set('trust proxy', 1);
   app.use((req, res, next) => {
+    if (hasSession(req)) return next();
     const h = req.headers.authorization || '';
     if (h.startsWith('Basic ')) {
       const pass = Buffer.from(h.slice(6), 'base64').toString().split(':').slice(1).join(':');
       const got = crypto.createHash('sha256').update(pass).digest();
-      if (crypto.timingSafeEqual(want, got)) return next();
+      if (crypto.timingSafeEqual(want, got)) {
+        res.cookie(COOKIE, sessionToken, { maxAge: 90 * 864e5, httpOnly: true, sameSite: 'lax', secure: req.secure, path: '/' });
+        return next();
+      }
     }
     res.set('WWW-Authenticate', 'Basic realm="Team Gantt"').status(401).send('Password required');
   });
@@ -262,11 +277,13 @@ app.patch('/api/members', wrap(async (req, res) => {
 // Friendly bulk add (merges into existing board). Used by the Import button and usable by scripts.
 // { "groups": [ { "name": "Art Database", "tasks": [ { "title": "...", "assignee": "Member 2",
 //                 "start": "2026-11-09", "end": "2026-11-13", "status": "todo", "progress": 0, "notes": "" } ] } ] }
-app.post('/api/bulk', wrap(async (req, res) => {
+// Apply an import (new tasks + updates) all-or-nothing. Throws with a readable message.
+async function applyImport(reqBody) {
+  const req = { body: reqBody };
   const groups = (req.body && req.body.groups) || [];
   const updates = (req.body && req.body.updates) || [];
   if (!Array.isArray(groups) || !Array.isArray(updates) || (!groups.length && !updates.length))
-    return bad(res, 'Expected { "groups": [ ... ] } and/or { "updates": [ ... ] }');
+    throw new Error('Expected { "groups": [ ... ] } and/or { "updates": [ ... ] }');
   const staged = JSON.parse(JSON.stringify(state));
   const saved = state; state = staged;
   try {
@@ -338,18 +355,25 @@ app.post('/api/bulk', wrap(async (req, res) => {
     }
     state.rev = saved.rev;
     bump(); await persist();
-    res.json({ ...state, added, updated });
+    return { added, updated };
   } catch (e) {
     state = saved;
-    bad(res, e.message);
+    throw e;
   }
+}
+
+app.post('/api/bulk', wrap(async (req, res) => {
+  try {
+    const r = await applyImport(req.body);
+    res.json({ ...state, ...r });
+  } catch (e) { bad(res, e.message); }
 }));
 
 // full restore from a backup
 app.put('/api/state', wrap(async (req, res) => {
   const b = req.body || {};
   if (!Array.isArray(b.members) || !Array.isArray(b.groups) || !Array.isArray(b.tasks)) return bad(res, 'Not a valid backup');
-  const next = { rev: state.rev, members: [], groups: [], tasks: [] };
+  const next = { rev: state.rev, members: [], groups: [], tasks: [], inboxLog: state.inboxLog || [] };
   const saved = state; state = next;
   try {
     for (const m of b.members) next.members.push({ id: str(m.id, 20), name: str(m.name, 40) || 'Member', color: isColor(m.color) ? m.color : PALETTE[0] });
@@ -375,9 +399,38 @@ app.put('/api/state', wrap(async (req, res) => {
   }
 }));
 
+// ---------------------------------------------------------------- inbox
+// Import files committed to inbox/ are applied once, in name order, on the next start (i.e. after each deploy).
+// Results are kept in state.inboxLog so the board shows what happened.
+const INBOX_DIR = path.join(__dirname, 'inbox');
+async function applyInbox() {
+  let files = [];
+  try { files = fs.readdirSync(INBOX_DIR).filter((f) => f.endsWith('.json')).sort(); } catch { return; }
+  state.inboxLog = Array.isArray(state.inboxLog) ? state.inboxLog : [];
+  const seen = new Set(state.inboxLog.map((x) => x.file));
+  for (const file of files) {
+    if (seen.has(file)) continue;
+    const entry = { file, at: new Date().toISOString(), ok: false };
+    try {
+      const body = JSON.parse(fs.readFileSync(path.join(INBOX_DIR, file), 'utf8'));
+      const r = await applyImport(body);
+      Object.assign(entry, { ok: true, added: r.added, updated: r.updated, note: str(body.description, 300) });
+      console.log(`inbox: applied ${file} (+${r.added} tasks, ${r.updated} updated)`);
+    } catch (e) {
+      entry.error = String(e.message).slice(0, 300);
+      console.error(`inbox: FAILED ${file}: ${entry.error}`);
+    }
+    state.inboxLog.push(entry);
+    state.inboxLog = state.inboxLog.slice(-200);
+    bump(); await persist();
+  }
+}
+app.get('/api/inbox-log', (req, res) => res.json(state.inboxLog || []));
+
 // ---------------------------------------------------------------- start
 (async () => {
   state = await loadState();
   if (!state) { state = defaultState(); await writeState(state); }
+  await applyInbox();
   app.listen(PORT, () => console.log(`Team Gantt on :${PORT} (storage: ${USE_SB ? 'supabase' : DATA_FILE}, password: ${PASSWORD ? 'on' : 'off'})`));
 })().catch((e) => { console.error('Startup failed:', e.message); process.exit(1); });

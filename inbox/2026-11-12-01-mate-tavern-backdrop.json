@@ -1,0 +1,13 @@
+{
+  "description": "Adam's tavern interior: use as title screen background and settlement conversation backdrop (Mate)",
+  "updates": [
+    {
+      "task": "T078",
+      "appendNotes": "ART AVAILABLE (Nov 12): Adam made a tavern interior scene. Use it as the title screen background (scale with nearest-neighbour so the pixels stay crisp, darken it slightly so the menu stays readable). It is a scene image, not a map tile."
+    },
+    {
+      "task": "T081",
+      "appendNotes": "ART AVAILABLE (Nov 12): Adam's tavern interior can be the backdrop behind conversations that happen in a settlement/tavern (show it faintly behind the chat panel, or as a header image when talking to an NPC there). Interiors are not playable maps in the MVP, so this is decoration only."
+    }
+  ]
+}

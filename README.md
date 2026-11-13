@@ -50,5 +50,14 @@ Write a JSON file in this shape and click **Import** (see `tasks.example.json`):
 
 The same JSON can be POSTed to `/api/bulk` by a script (`curl -u :PASSWORD -H 'Content-Type: application/json' -d @tasks.json https://YOUR-APP.onrender.com/api/bulk`).
 
+## Signing in
+With `TEAM_PASSWORD` set, the browser asks for the password once and then keeps a 90-day sign-in cookie.
+Changing `TEAM_PASSWORD` in Render signs everyone out.
+
+## Inbox (changes without opening the board)
+Commit an import file to `inbox/` (see `inbox/README.md`) and push to `main`. After Render redeploys, the board applies it once,
+all-or-nothing, and lists the result under **Auto-updates**. This needs a persistent disk or Supabase storage
+(see "Keeping the data"), otherwise the board forgets which files it already applied.
+
 ## Run locally
 `npm install && npm start`, then open http://localhost:3000 (data is saved in `./data`).

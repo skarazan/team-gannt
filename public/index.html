@@ -199,6 +199,7 @@
   </select>
   <button class="btn" id="todayBtn">Today</button>
   <button class="btn" id="teamBtn">Team</button>
+  <button class="btn" id="logBtn" title="Changes applied automatically from the repo inbox">Auto-updates<span class="badge" id="logCount"></span></button>
   <button class="btn" id="exportBtn">Export</button>
   <button class="btn" id="importBtn">Import</button>
   <input type="file" id="importFile" accept="application/json,.json" hidden>
@@ -207,6 +208,15 @@
 </header>
 <div id="main"><div id="scroller"><div id="chart"></div></div><aside id="mine" hidden></aside></div>
 <div id="toast"></div>
+
+<dialog id="logDlg">
+  <form onsubmit="return false">
+    <h2>Auto-updates</h2>
+    <div style="color:var(--muted);font-size:13px">Import files committed to the repo's <code>inbox/</code> folder are applied once after each deploy.</div>
+    <div id="logRows" style="display:grid;gap:8px;max-height:60vh;overflow:auto"></div>
+    <div class="actions"><button type="button" class="btn primary" id="logClose">Close</button></div>
+  </form>
+</dialog>
 
 <dialog id="meDlg">
   <form onsubmit="return false">
@@ -356,7 +366,7 @@ function renderChips() {
 }
 
 function render() {
-  renderChips(); renderMe(); renderMine();
+  renderChips(); renderMe(); renderMine(); renderLogBadge();
   const dw = ui.dayW, today = todayDay();
   let mn = today, mx = today + 49;
   for (const t of S.tasks) { mn = Math.min(mn, toDay(t.start)); mx = Math.max(mx, toDay(t.end)); }
@@ -807,6 +817,20 @@ $('#mine').addEventListener('change', (e) => {
   }
   else if (a.dataset.act === 'st') mutate('PATCH', '/api/tasks/' + id, a.value === 'done' ? { status: 'done', progress: 100 } : { status: a.value });
 });
+
+// ---------------------------------------------------------------- auto-update log
+function renderLogBadge() {
+  const log = S.inboxLog || [], seen = +(localStorage.getItem('gantt.logSeen') || 0);
+  const fresh = log.filter((x) => Date.parse(x.at) > seen).length;
+  $('#logCount').textContent = fresh ? fresh : '';
+}
+$('#logBtn').onclick = () => {
+  const log = [...(S.inboxLog || [])].reverse();
+  $('#logRows').innerHTML = log.length ? log.map((x) => `<div class="note ${x.ok ? '' : 'warning'}"><div class="nm"><b>${esc(x.file)}</b><span>${whenStr(x.at)}</span><span class="${x.ok ? '' : 'wtag'}">${x.ok ? `+${x.added || 0} tasks, ${x.updated || 0} updated` : '&#9888; FAILED, nothing changed'}</span></div><div class="tx">${esc(x.ok ? (x.note || '') : x.error)}</div></div>`).join('') : '<p style="color:var(--muted)">Nothing applied yet.</p>';
+  localStorage.setItem('gantt.logSeen', String(Date.now())); renderLogBadge();
+  $('#logDlg').showModal();
+};
+$('#logClose').onclick = () => $('#logDlg').close();
 
 // ---------------------------------------------------------------- live sync (shared board)
 async function poll() {
