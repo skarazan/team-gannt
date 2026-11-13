@@ -14,6 +14,18 @@ const SB_URL = (process.env.SUPABASE_URL || '').replace(/\/$/, '');
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY || '';
 const USE_SB = !!(SB_URL && SB_KEY);
 
+const escHtml = (v) => String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const LOGIN_PAGE = (failed, nextUrl) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Team Gantt: sign in</title>
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;font:15px system-ui,-apple-system,"Segoe UI",sans-serif;background:#f3f4fb;color:#0a0a1f}
+form{background:#fff;border:2px solid #111;border-radius:14px;padding:26px 26px 22px;width:min(340px,90vw);display:grid;gap:12px;box-shadow:0 10px 30px rgba(0,0,0,.12)}
+h1{margin:0;font-size:20px}p{margin:0;color:#6b7090;font-size:13px}input{border:2px solid #111;border-radius:8px;padding:9px 10px;font:inherit}
+button{border:2px solid #111;border-radius:8px;padding:9px;font:inherit;font-weight:700;background:#5271FF;color:#fff;cursor:pointer}.err{color:#d11;font-weight:700}</style></head>
+<body><form method="post" action="/login"><h1>Team Gantt</h1><p>Enter the team password. This browser stays signed in for 90 days.</p>
+${failed ? '<p class="err">Wrong password, try again.</p>' : ''}
+<input type="password" name="password" autocomplete="current-password" placeholder="Team password" autofocus required>
+<input type="hidden" name="next" value="${escHtml(nextUrl.replace(/[?&]failed=1/, '') || '/')}">
+<button type="submit">Sign in</button></form></body></html>`;
+
 const PALETTE = ['#5271FF', '#FF7A1F', '#0097B2', '#FF5757', '#7F4FFF', '#38B6FF', '#5CE1E6'];
 const STATUSES = ['todo', 'doing', 'done', 'blocked'];
 const uid = (p) => p + crypto.randomBytes(4).toString('hex');
@@ -147,6 +159,14 @@ if (PASSWORD) {
     return a.length === b.length && crypto.timingSafeEqual(a, b);
   });
   app.set('trust proxy', 1);
+  // Sign-in form posts here: { password, next }
+  app.post('/login', express.urlencoded({ extended: false, limit: '4kb' }), (req, res) => {
+    const got = crypto.createHash('sha256').update(String(req.body.password || '')).digest();
+    const next = typeof req.body.next === 'string' && req.body.next.startsWith('/') && !req.body.next.startsWith('//') ? req.body.next : '/';
+    if (!crypto.timingSafeEqual(want, got)) return res.redirect(303, '/?failed=1');
+    res.cookie(COOKIE, sessionToken, { maxAge: 90 * 864e5, httpOnly: true, sameSite: 'lax', secure: req.secure, path: '/' });
+    res.redirect(303, next.replace(/[?&]failed=1/, '') || '/');
+  });
   app.use((req, res, next) => {
     if (hasSession(req)) return next();
     const h = req.headers.authorization || '';
@@ -157,6 +177,12 @@ if (PASSWORD) {
         res.cookie(COOKIE, sessionToken, { maxAge: 90 * 864e5, httpOnly: true, sameSite: 'lax', secure: req.secure, path: '/' });
         return next();
       }
+    }
+    // Browsers get a sign-in page (works in browsers/panes that never show the basic-auth popup);
+    // scripts can still use HTTP basic auth.
+    if (req.method === 'GET' && (req.headers.accept || '').includes('text/html')) {
+      const failed = req.query.failed === '1';
+      return res.status(401).type('html').send(LOGIN_PAGE(failed, req.originalUrl));
     }
     res.set('WWW-Authenticate', 'Basic realm="Team Gantt"').status(401).send('Password required');
   });
