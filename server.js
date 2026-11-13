@@ -263,12 +263,28 @@ app.patch('/api/members', wrap(async (req, res) => {
 // { "groups": [ { "name": "Art Database", "tasks": [ { "title": "...", "assignee": "Member 2",
 //                 "start": "2026-11-09", "end": "2026-11-13", "status": "todo", "progress": 0, "notes": "" } ] } ] }
 app.post('/api/bulk', wrap(async (req, res) => {
-  const groups = req.body && req.body.groups;
-  if (!Array.isArray(groups)) return bad(res, 'Expected { "groups": [ ... ] }');
+  const groups = (req.body && req.body.groups) || [];
+  const updates = (req.body && req.body.updates) || [];
+  if (!Array.isArray(groups) || !Array.isArray(updates) || (!groups.length && !updates.length))
+    return bad(res, 'Expected { "groups": [ ... ] } and/or { "updates": [ ... ] }');
   const staged = JSON.parse(JSON.stringify(state));
   const saved = state; state = staged;
   try {
-    let added = 0;
+    let added = 0, updated = 0;
+    // "T005" or "t_t005" -> task id
+    const resolve = (ref, ctx) => {
+      const r = String(ref).trim();
+      const id = /^t\d+$/i.test(r) ? 't_' + r.toLowerCase() : r;
+      if (!state.tasks.some((x) => x.id === id)) throw new Error(`Unknown task "${r}" (${ctx})`);
+      return id;
+    };
+    const memberRef = (ref, ctx) => {
+      if (ref === null || ref === '') return null;
+      const m = state.members.find((x) => x.name.toLowerCase() === String(ref).toLowerCase() || x.id === ref);
+      if (!m) throw new Error(`Unknown assignee "${ref}" (${ctx})`);
+      return m.id;
+    };
+    const pendingDeps = [], pendingBlocks = [];
     for (const gi of groups) {
       const name = str(gi.name, 80);
       if (!name) throw new Error('Every group needs a name');
@@ -280,20 +296,49 @@ app.post('/api/bulk', wrap(async (req, res) => {
       for (const ti of Array.isArray(gi.tasks) ? gi.tasks : []) {
         const input = { title: ti.title, groupId: g.id, start: ti.start, end: ti.end || ti.start };
         for (const k of ['progress', 'status', 'notes']) if (k in ti) input[k] = ti[k];
-        if (ti.assignee) {
-          const m = state.members.find((x) => x.name.toLowerCase() === String(ti.assignee).toLowerCase() || x.id === ti.assignee);
-          if (!m) throw new Error(`Unknown assignee "${ti.assignee}" (task "${ti.title}")`);
-          input.assigneeId = m.id;
-        }
+        if (ti.assignee) input.assigneeId = memberRef(ti.assignee, `task "${ti.title}"`);
         const t = { id: nextTaskId(), groupId: g.id, title: '', assigneeId: null, start: '', end: '', progress: 0, status: 'todo', notes: '', deps: [], log: [] };
         const err = applyTask(t, input);
         if (err) throw new Error(`${err} (task "${ti.title}")`);
         state.tasks.push(t); added++;
+        if (Array.isArray(ti.deps)) pendingDeps.push([t, ti.deps, `task "${ti.title}"`]);
+        if (Array.isArray(ti.unblocks)) pendingBlocks.push([t, ti.unblocks, `task "${ti.title}"`]);
       }
+    }
+    // new tasks' dependencies (may point at existing tasks or at each other)
+    for (const [t, refs, ctx] of pendingDeps) {
+      const err = applyTask(t, { deps: refs.map((r) => resolve(r, ctx)) });
+      if (err) throw new Error(`${err} (${ctx})`);
+    }
+    // "unblocks": existing tasks that should wait on this new task
+    for (const [t, refs, ctx] of pendingBlocks) {
+      for (const r of refs) {
+        const other = state.tasks.find((x) => x.id === resolve(r, ctx));
+        const err = applyTask(other, { deps: [...new Set([...(other.deps || []), t.id])] });
+        if (err) throw new Error(`${err} (${ctx} unblocks ${r})`);
+      }
+    }
+    // edits to existing tasks: { "task": "T005", "title"?, "notes"?, "appendNotes"?, "assignee"?, "start"?, "end"?, "status"?, "addDeps"?, "removeDeps"? }
+    for (const u of updates) {
+      const id = resolve(u.task, 'updates');
+      const t = state.tasks.find((x) => x.id === id);
+      const input = {};
+      for (const k of ['title', 'notes', 'start', 'end', 'status', 'progress']) if (k in u) input[k] = u[k];
+      if ('appendNotes' in u) input.notes = ((t.notes || '') + '\n' + String(u.appendNotes)).trim();
+      if ('assignee' in u) input.assigneeId = memberRef(u.assignee, `update ${u.task}`);
+      if (u.addDeps || u.removeDeps) {
+        const add = (u.addDeps || []).map((r) => resolve(r, `update ${u.task}`));
+        const rm = new Set((u.removeDeps || []).map((r) => resolve(r, `update ${u.task}`)));
+        input.deps = [...new Set([...(t.deps || []), ...add])].filter((d) => !rm.has(d));
+      }
+      const copy = { ...t };
+      const err = applyTask(copy, input);
+      if (err) throw new Error(`${err} (update ${u.task})`);
+      Object.assign(t, copy); updated++;
     }
     state.rev = saved.rev;
     bump(); await persist();
-    res.json({ ...state, added });
+    res.json({ ...state, added, updated });
   } catch (e) {
     state = saved;
     bad(res, e.message);

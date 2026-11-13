@@ -507,8 +507,8 @@ $('#importFile').addEventListener('change', async (e) => {
   if (Array.isArray(data.members) && Array.isArray(data.tasks) && Array.isArray(data.groups)) {
     if (!confirm('This is a full backup. Replace the whole board with it?')) return;
     await mutate('PUT', '/api/state', data);
-  } else if (Array.isArray(data.groups)) {
-    try { const r = await api('POST', '/api/bulk', data); S = r; render(); toast(`Added ${r.added} task(s)`); } catch (err) { toast(err.message); }
+  } else if (Array.isArray(data.groups) || Array.isArray(data.updates)) {
+    try { const r = await api('POST', '/api/bulk', data); S = r; render(); toast(`Added ${r.added} task(s)` + (r.updated ? `, updated ${r.updated}` : '')); } catch (err) { toast(err.message); }
   } else toast('Unrecognized file format');
 });
 

@@ -44,6 +44,9 @@ Write a JSON file in this shape and click **Import** (see `tasks.example.json`):
 - `assignee` is a team member's name as shown in the app (or leave it out). `end` defaults to `start`.
 - `status`: `todo`, `doing`, `done`, `blocked`. Dates are `YYYY-MM-DD`.
 - If anything in the file is invalid, nothing is imported and the app tells you why.
+- New tasks can list `"deps": ["T005"]` (tasks they wait on) and `"unblocks": ["T047"]` (existing tasks that should wait on them).
+- A top-level `"updates"` list edits existing tasks without touching anything else:
+  `{ "task": "T005", "title": "...", "appendNotes": "...", "assignee": "Saba", "start": "2026-11-17", "end": "...", "status": "doing", "addDeps": ["T002"], "removeDeps": ["T001"] }`
 
 The same JSON can be POSTed to `/api/bulk` by a script (`curl -u :PASSWORD -H 'Content-Type: application/json' -d @tasks.json https://YOUR-APP.onrender.com/api/bulk`).
 
